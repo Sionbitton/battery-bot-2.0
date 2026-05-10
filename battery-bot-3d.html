@@ -1,0 +1,2402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Battery Bot 3D</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0a0e27;
+    color: #e8eef9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    overflow: hidden;
+    user-select: none;
+    height: 100%;
+  }
+  canvas { display: block; }
+  .panel {
+    position: fixed;
+    background: rgba(19, 24, 46, 0.85);
+    border-radius: 8px;
+    padding: 10px 14px;
+    backdrop-filter: blur(6px);
+    font-size: 14px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  #stats { top: 16px; left: 16px; }
+  #battery-panel {
+    top: 16px; right: 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .meter {
+    display: inline-block;
+    width: 200px; height: 14px;
+    background: #2a3052;
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .meter > div {
+    height: 100%;
+    transition: width 0.1s linear, background 0.3s;
+  }
+  #hint {
+    bottom: 16px; left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.75;
+    line-height: 1.6;
+    white-space: nowrap;
+  }
+  kbd {
+    background: #2a3052;
+    border-radius: 3px;
+    padding: 1px 6px;
+    font-family: inherit;
+    font-size: 11px;
+    border: 1px solid #3a4070;
+  }
+  #overlay {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background: rgba(10, 14, 39, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 10;
+  }
+  #overlay h2 { margin: 0 0 8px; font-size: 32px; }
+  #overlay p { margin: 4px 0; opacity: 0.8; }
+  button {
+    background: #4d7cff;
+    color: white;
+    border: 0;
+    padding: 12px 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 20px;
+    transition: background 0.15s, transform 0.1s;
+  }
+  button:hover { background: #6691ff; }
+  button:active { transform: scale(0.97); }
+  .hud-btn {
+    position: fixed;
+    background: rgba(19,24,46,0.85);
+    border: 1px solid #3a4070;
+    border-radius: 8px;
+    padding: 10px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    font-family: inherit;
+    margin: 0;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .hud-btn:hover { background: rgba(30,38,72,0.95); }
+  .upgrade-card {
+    background: #0a0e27;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 14px;
+    text-align: left;
+  }
+  .upgrade-card.disabled { opacity: 0.5; }
+  .upgrade-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  /* ==== Mobile touch controls ==== */
+  /* Hidden by default; shown only when body.touch is set in JS. */
+  #touchControls { display: none; }
+  body.touch #touchControls { display: block; }
+  body.touch #hint { display: none; }
+  .touch-btn {
+    position: fixed;
+    z-index: 8;
+    background: rgba(19,24,46,0.65);
+    border: 2px solid rgba(255,255,255,0.18);
+    border-radius: 50%;
+    color: #e8eef9;
+    font-size: 30px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: none;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    transition: transform 0.08s, background 0.08s;
+  }
+  .touch-btn.active { transform: scale(0.94); }
+  /* Steering pad bottom-left */
+  #touchLeft  { bottom: calc(28px + env(safe-area-inset-bottom)); left:  calc(20px + env(safe-area-inset-left)); width: 84px; height: 84px; }
+  #touchRight { bottom: calc(28px + env(safe-area-inset-bottom)); left:  calc(120px + env(safe-area-inset-left)); width: 84px; height: 84px; }
+  #touchLeft.active, #touchRight.active { background: rgba(77,124,255,0.85); }
+  /* Pedals bottom-right */
+  #touchGas {
+    bottom: calc(28px + env(safe-area-inset-bottom));
+    right:  calc(20px + env(safe-area-inset-right));
+    width: 100px; height: 100px;
+    font-size: 16px; letter-spacing: 1px;
+    background: rgba(34,197,94,0.55);
+  }
+  #touchGas.active { background: rgba(34,197,94,0.95); }
+  #touchBrake {
+    bottom: calc(28px + env(safe-area-inset-bottom));
+    right:  calc(132px + env(safe-area-inset-right));
+    width: 76px; height: 76px;
+    font-size: 14px; letter-spacing: 1px;
+    background: rgba(239,68,68,0.45);
+  }
+  #touchBrake.active { background: rgba(239,68,68,0.85); }
+</style>
+</head>
+<body>
+
+<div id="stats" class="panel">
+  <div>Distance: <strong id="dist">0</strong> m &nbsp;•&nbsp; Speed Lv. <strong id="speedLv">1</strong></div>
+  <div style="margin-top:4px;">Money: <strong id="money" style="color:#fde047">$0</strong> &nbsp;•&nbsp; Engine Lv. <strong id="upgLv">0</strong></div>
+  <div id="passenger" style="margin-top:4px; color:#94a3b8;">Passenger: 0/1</div>
+</div>
+
+<button class="hud-btn" id="pauseBtn"  onclick="openPause()"  style="top:84px;  left:16px; color:#fbbf24;">PAUSE</button>
+<button class="hud-btn" id="garageBtn" onclick="openGarage()" style="top:128px; left:16px; color:#fde047;">OPEN GARAGE</button>
+<button class="hud-btn" id="musicBtn"  onclick="toggleMusic()" style="top:172px; left:16px; color:#a5b4fc;">MUSIC: ON</button>
+
+<div id="navPanel" class="panel" style="top:220px; left:16px; min-width:220px; padding:12px 14px;">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <svg id="navArrowSvg" viewBox="0 0 32 32" width="38" height="38" style="flex-shrink:0; transition:transform 0.18s ease-out; filter:drop-shadow(0 0 6px currentColor); color:#4ade80;">
+      <path id="navArrowPath" d="M16 3 L27 27 L16 22 L5 27 Z" fill="currentColor"/>
+    </svg>
+    <div style="flex:1; min-width:0;">
+      <div id="navObjective" style="font-size:13px; font-weight:600; margin-bottom:2px;">Find a passenger</div>
+      <div id="navDistance" style="font-size:12px; opacity:0.7;">—</div>
+    </div>
+  </div>
+</div>
+
+<!-- Objective panel: tells the player what to do + which way to go + how far -->
+<div id="objective" class="panel" style="top:88px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px; min-width:240px;">
+  <div id="objArrow" style="font-size:30px; line-height:1; transform-origin:center; transition:transform 0.12s; color:#4ade80; font-weight:700;">▲</div>
+  <div>
+    <div id="objText" style="font-weight:600; font-size:14px; line-height:1.2;">Find a passenger</div>
+    <div id="objDist" style="opacity:0.65; font-size:12px; margin-top:2px;">—</div>
+  </div>
+</div>
+
+<div id="levelup" style="position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); font-size:48px; font-weight:700; color:#fde047; text-shadow:0 0 24px #f59e0b, 0 4px 0 #b45309; opacity:0; pointer-events:none; transition:opacity 0.3s; z-index:5;">SPEED UP!</div>
+<div id="charged" style="position:fixed; top:36%; left:50%; transform:translate(-50%,-50%); font-size:32px; font-weight:700; color:#60a5fa; text-shadow:0 0 24px #1e40af, 0 3px 0 #1e3a8a; opacity:0; pointer-events:none; transition:opacity 0.3s; z-index:5;">MOOD MAXED!</div>
+<div id="payout"  style="position:fixed; top:42%; left:50%; transform:translate(-50%,-50%); font-size:38px; font-weight:700; color:#4ade80; text-shadow:0 0 18px #15803d, 0 3px 0 #14532d; opacity:0; pointer-events:none; transition:opacity 0.5s, top 0.8s; z-index:6;">+$0</div>
+<div id="crash"   style="position:fixed; top:38%; left:50%; transform:translate(-50%,-50%); font-size:54px; font-weight:800; color:#fca5a5; text-shadow:0 0 32px #b91c1c, 0 4px 0 #7f1d1d; opacity:0; pointer-events:none; transition:opacity 0.2s; z-index:7;">CRASH!</div>
+<div id="crashFlash" style="position:fixed; inset:0; background:#dc2626; opacity:0; pointer-events:none; transition:opacity 0.3s; z-index:4; mix-blend-mode:overlay;"></div>
+
+<div id="battery-panel" class="panel">
+  <span>Alien Mood</span>
+  <span class="meter"><div id="bat" style="width:100%; background:#4ade80"></div></span>
+  <strong id="batPct">100%</strong>
+</div>
+
+<div id="hint" class="panel">
+  <kbd>W</kbd>/<kbd>S</kbd> throttle &nbsp; <kbd>A</kbd>/<kbd>D</kbd> steer &nbsp; • &nbsp; pick up <span style="color:#4ade80">civilians</span> for company, drop at <span style="color:#facc15">houses</span> &nbsp; • &nbsp; <span style="color:#60a5fa">⚡ blue pad</span> = mood boost
+</div>
+
+<div id="overlay">
+  <h2 id="endMsg">Mood crashed!</h2>
+  <p>Distance traveled: <strong id="finalDist">0</strong> m</p>
+  <p>Total money: <strong id="finalMoney">$0</strong></p>
+  <button onclick="restart()">Try Again</button>
+</div>
+
+<div id="garageOverlay" style="position:fixed; inset:0; display:none; background:rgba(10,14,39,0.92); align-items:center; justify-content:center; z-index:20; backdrop-filter:blur(8px); flex-direction:column;">
+  <div style="background:#13182e; border:1px solid #2a3052; border-radius:12px; padding:28px 32px; min-width:400px; max-width:460px; box-shadow:0 20px 60px rgba(0,0,0,0.5); text-align:center;">
+    <h2 style="margin:0 0 4px; font-size:28px;">Garage</h2>
+    <p style="opacity:0.6; margin:0 0 20px; font-size:13px;">Spend money to upgrade your ride.</p>
+    <div class="upgrade-card" style="text-align:center;">
+      <div style="opacity:0.6; font-size:12px; letter-spacing:0.5px; text-transform:uppercase;">Wallet</div>
+      <div style="font-size:32px; font-weight:700; color:#fde047;">$<span id="garageMoney">0</span></div>
+    </div>
+    <div class="upgrade-card">
+      <div class="upgrade-row">
+        <span style="font-weight:600; font-size:16px;">Engine</span>
+        <span style="opacity:0.7; font-size:13px;">Lv. <strong id="garageUpgLv">0</strong></span>
+      </div>
+      <div style="opacity:0.6; font-size:12px; line-height:1.5; margin-bottom:10px;">Each level adds <strong style="color:#4ade80">+15</strong> to top speed.</div>
+      <button id="buyUpgradeBtn" onclick="buyUpgrade()" style="width:100%; padding:12px; font-size:15px; margin-top:0;">Upgrade Engine — $<span id="garageCost">10</span></button>
+      <div id="garageMsg" style="font-size:13px; min-height:18px; margin-top:8px; color:#ef4444;">&nbsp;</div>
+    </div>
+    <div class="upgrade-card disabled">
+      <div class="upgrade-row">
+        <span style="font-weight:600; font-size:16px;">Car Color</span>
+        <span style="opacity:0.7; font-size:13px; color:#94a3b8;">Coming soon</span>
+      </div>
+      <button onclick="comingSoon()" style="width:100%; padding:10px; font-size:14px; margin-top:0; background:#2a3052; cursor:not-allowed;">Pick a color (locked)</button>
+    </div>
+    <div class="upgrade-card disabled">
+      <div class="upgrade-row">
+        <span style="font-weight:600; font-size:16px;">Driver</span>
+        <span style="opacity:0.7; font-size:13px; color:#94a3b8;">Coming soon</span>
+      </div>
+      <button onclick="comingSoon()" style="width:100%; padding:10px; font-size:14px; margin-top:0; background:#2a3052; cursor:not-allowed;">Choose driver (locked)</button>
+    </div>
+    <button onclick="confirmReset()" style="background:transparent; color:#fca5a5; border:1px solid #7f1d1d; padding:8px 18px; font-size:12px; margin-top:12px;">Reset Progress</button>
+    <button onclick="closeGarage()" style="background:transparent; color:#e8eef9; border:1px solid #3a4070; padding:10px 24px; font-size:14px; margin-top:8px;">Close (Esc)</button>
+  </div>
+</div>
+
+<!-- Pause overlay — opened by Pause button or P key. Sets state.paused=true. -->
+<div id="pauseOverlay" style="position:fixed; inset:0; display:none; background:rgba(10,14,39,0.92); align-items:center; justify-content:center; z-index:20; backdrop-filter:blur(8px); flex-direction:column;">
+  <div style="background:#13182e; border:1px solid #2a3052; border-radius:12px; padding:32px 36px; min-width:320px; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,0.5); text-align:center;">
+    <h2 style="margin:0 0 6px; font-size:30px; color:#fbbf24;">Paused</h2>
+    <p style="opacity:0.6; margin:0 0 24px; font-size:13px;">Game is frozen. Resume to keep playing.</p>
+    <button onclick="closePause()" style="width:100%; padding:14px; font-size:16px; margin-top:0;">Resume</button>
+    <button onclick="openMainMenu()" style="width:100%; padding:12px; font-size:14px; margin-top:10px; background:#2a3052;">Main Menu</button>
+    <p style="opacity:0.4; margin:14px 0 0; font-size:11px;">Press P or Esc to resume</p>
+  </div>
+</div>
+
+<!-- Main Menu overlay — opened from the Pause overlay. Lets the player start a new run or continue. -->
+<div id="mainMenuOverlay" style="position:fixed; inset:0; display:none; background:rgba(10,14,39,0.95); align-items:center; justify-content:center; z-index:21; backdrop-filter:blur(10px); flex-direction:column;">
+  <div style="background:#13182e; border:1px solid #2a3052; border-radius:12px; padding:32px 36px; min-width:340px; max-width:440px; box-shadow:0 20px 60px rgba(0,0,0,0.5); text-align:center;">
+    <h2 style="margin:0 0 4px; font-size:32px; color:#4ade80;">Battery Bot</h2>
+    <p style="opacity:0.6; margin:0 0 24px; font-size:13px;">Pick a mode</p>
+    <button onclick="startNormalMode()" style="width:100%; padding:14px; font-size:16px; margin-top:0;">Start Normal Mode</button>
+    <button id="speedModeBtn" onclick="startSpeedMode()" style="width:100%; padding:14px; font-size:16px; margin-top:10px; background:#7c3aed;">Start Speed Mode</button>
+    <button id="continueBtn" onclick="continueGame()" style="width:100%; padding:12px; font-size:14px; margin-top:10px; background:#2a3052; display:none;">Continue Game</button>
+    <p style="opacity:0.5; margin:14px 0 0; font-size:11px; color:#c4b5fd;">Speed Mode: fast from the start, ramps to chaotic, hit pedestrians for fun. Mood still drains — find charge pads to survive.</p>
+  </div>
+</div>
+
+<!-- Mobile touch controls. Hidden via CSS unless body.touch is set in JS. -->
+<div id="touchControls">
+  <div id="touchLeft"  class="touch-btn" data-key="a">◀</div>
+  <div id="touchRight" class="touch-btn" data-key="d">▶</div>
+  <div id="touchGas"   class="touch-btn" data-key="w">GAS</div>
+  <div id="touchBrake" class="touch-btn" data-key="s">BRK</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xb8c8d4);
+scene.fog = new THREE.Fog(0xb8c8d4, 80, 280);
+
+const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 600);
+camera.position.set(0, 5, -10);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const sun = new THREE.DirectionalLight(0xfff0c4, 1.1);
+sun.position.set(60, 90, 30);
+sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 250;
+sun.shadow.camera.left = -60;
+sun.shadow.camera.right = 60;
+sun.shadow.camera.top = 60;
+sun.shadow.camera.bottom = -60;
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0x6e88a8, 0.55));
+scene.add(new THREE.HemisphereLight(0xb8c8d4, 0x6b4e2c, 0.4));
+
+const LANE_WIDTH    = 4;
+const LANE_COUNT    = 3;
+const ROAD_WIDTH    = LANE_WIDTH * LANE_COUNT;
+const ROAD_HALF     = ROAD_WIDTH / 2;
+const RAIL_OFFSET   = ROAD_HALF + 0.4;
+const DRIVE_HALF    = ROAD_HALF - 0.6;
+const STREAM_AHEAD  = 350;
+const STREAM_BEHIND = 90;
+const STREAM_TOTAL  = STREAM_AHEAD + STREAM_BEHIND;
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(400, 800),
+  new THREE.MeshStandardMaterial({ color: 0xa67e4a, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const road = new THREE.Mesh(
+  new THREE.PlaneGeometry(ROAD_WIDTH, 800),
+  new THREE.MeshStandardMaterial({ color: 0x6b5031, roughness: 1 })
+);
+road.rotation.x = -Math.PI / 2;
+road.position.y = 0.01;
+road.receiveShadow = true;
+scene.add(road);
+
+function makeEdgeLine(xOffset) {
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.25, 800),
+    new THREE.MeshStandardMaterial({ color: 0xf5e9c2, roughness: 0.8 })
+  );
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(xOffset, 0.02, 0);
+  scene.add(m);
+  return m;
+}
+const edgeL = makeEdgeLine(-ROAD_HALF + 0.2);
+const edgeR = makeEdgeLine( ROAD_HALF - 0.2);
+
+const laneMarkers = [];
+const DASH_LENGTH = 3, DASH_GAP = 4, DASH_PERIOD = DASH_LENGTH + DASH_GAP;
+const DASH_COUNT_PER_LANE = Math.ceil(STREAM_TOTAL / DASH_PERIOD) + 2;
+for (let lane = 0; lane < LANE_COUNT - 1; lane++) {
+  const xOff = -ROAD_HALF + LANE_WIDTH * (lane + 1);
+  for (let i = 0; i < DASH_COUNT_PER_LANE; i++) {
+    const dash = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.25, DASH_LENGTH),
+      new THREE.MeshStandardMaterial({ color: 0xf5e9c2, roughness: 0.9 })
+    );
+    dash.rotation.x = -Math.PI / 2;
+    dash.position.set(xOff, 0.02, -STREAM_BEHIND + i * DASH_PERIOD);
+    scene.add(dash);
+    laneMarkers.push({ mesh: dash });
+  }
+}
+
+const railMatTop = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, metalness: 0.7, roughness: 0.3 });
+const railMatBot = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.6, roughness: 0.4 });
+function makeRailPipe(xOff, y) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 800, 8), y > 0.6 ? railMatTop : railMatBot);
+  m.rotation.x = Math.PI / 2;
+  m.position.set(xOff, y, 0);
+  scene.add(m);
+  return m;
+}
+const railTopL = makeRailPipe(-RAIL_OFFSET, 1.1);
+const railBotL = makeRailPipe(-RAIL_OFFSET, 0.55);
+const railTopR = makeRailPipe( RAIL_OFFSET, 1.1);
+const railBotR = makeRailPipe( RAIL_OFFSET, 0.55);
+
+const POST_SPACING = 4;
+const POST_COUNT_PER_SIDE = Math.ceil(STREAM_TOTAL / POST_SPACING) + 2;
+const railPosts = [];
+function makeRailPost(xOff) {
+  const post = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 1.3, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.5, roughness: 0.6 })
+  );
+  post.position.set(xOff, 0.65, 0);
+  post.castShadow = true;
+  scene.add(post);
+  return post;
+}
+for (let side = 0; side < 2; side++) {
+  const xOff = side === 0 ? -RAIL_OFFSET : RAIL_OFFSET;
+  for (let i = 0; i < POST_COUNT_PER_SIDE; i++) {
+    const post = makeRailPost(xOff);
+    post.position.z = -STREAM_BEHIND + i * POST_SPACING;
+    railPosts.push({ mesh: post });
+  }
+}
+
+const trees = [];
+const TREE_COUNT = 90;
+
+// Shared procedurally-generated bark texture — used by all 90 tree trunks.
+// Drawn once on a hidden canvas, then wrapped as a CanvasTexture so the
+// GPU can repeat-tile it. Cheap memory-wise: one texture for everything.
+const barkTexture = (() => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 256;
+  const c = canvas.getContext('2d');
+  // base brown
+  c.fillStyle = '#4a2c14';
+  c.fillRect(0, 0, canvas.width, canvas.height);
+  // vertical bark grain (short streaks at random heights)
+  for (let i = 0; i < 70; i++) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    const len = 10 + Math.random() * 50;
+    const w   = 0.5 + Math.random() * 2.2;
+    c.fillStyle = Math.random() < 0.5 ? 'rgba(20,12,5,0.6)' : 'rgba(110,80,50,0.5)';
+    c.fillRect(x, y, w, len);
+  }
+  // moss / lichen spots
+  for (let i = 0; i < 28; i++) {
+    const x = Math.random() * canvas.width;
+    const y = Math.random() * canvas.height;
+    const r = 1.2 + Math.random() * 3;
+    c.fillStyle = `rgba(${50 + Math.random()*40},${80 + Math.random()*50},${40 + Math.random()*30},0.35)`;
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
+  }
+  // dark speckle / pores
+  for (let i = 0; i < 140; i++) {
+    c.fillStyle = 'rgba(0,0,0,0.4)';
+    c.fillRect(Math.random() * canvas.width, Math.random() * canvas.height,
+               0.5 + Math.random(), 0.5 + Math.random());
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+})();
+
+// Tree v3 — stylized realistic.
+//   - Tapered trunk (narrower at top) using shared bark texture
+//   - 3 branches sticking out at angles (share trunkMat to save memory)
+//   - Foliage = 9 clustered low-poly spheres in their own subgroup so we
+//     can apply wind sway without affecting the trunk
+//   - Per-tree windPhase so trees don't sway in unison
+const FOLIAGE_CLUSTERS = 9;
+const TREE_BRANCHES = 3;
+function makeTree() {
+  const g = new THREE.Group();
+
+  // Trunk: tapered (top radius 0.18, bottom 0.45), 10-sided for smoother curves
+  const trunkMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff, map: barkTexture, roughness: 1
+  });
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.18, 0.45, 1, 10, 2),
+    trunkMat
+  );
+  trunk.castShadow = true;
+  g.add(trunk);
+
+  // Branches — same material as trunk so they share the bark texture
+  const branches = [];
+  for (let i = 0; i < TREE_BRANCHES; i++) {
+    const b = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.1, 1, 6),
+      trunkMat
+    );
+    b.castShadow = true;
+    branches.push(b);
+    g.add(b);
+  }
+
+  // Foliage clusters — own subgroup so wind sway only rotates the leaves
+  const foliageGroup = new THREE.Group();
+  g.add(foliageGroup);
+  const foliageMat = new THREE.MeshStandardMaterial({
+    color: 0x3d6b2e, flatShading: true, roughness: 0.85
+  });
+  const clusters = [];
+  for (let i = 0; i < FOLIAGE_CLUSTERS; i++) {
+    const c = new THREE.Mesh(
+      new THREE.SphereGeometry(0.5, 6, 5),
+      foliageMat
+    );
+    c.castShadow = true;
+    clusters.push(c);
+    foliageGroup.add(c);
+  }
+
+  scene.add(g);
+  return {
+    mesh: g, trunk, branches, foliageGroup, clusters,
+    trunkMat, foliageMat,
+    windPhase: Math.random() * Math.PI * 2
+  };
+}
+function randomizeTree(t) {
+  // Taller trunks now, since the foliage is more compact
+  const h = 2.0 + Math.random() * 2.2;
+
+  // Trunk
+  t.trunk.scale.set(1, h, 1);
+  t.trunk.position.y = h / 2;
+
+  // Branches — 3 of them, evenly spaced around the trunk at varying heights
+  for (let i = 0; i < t.branches.length; i++) {
+    const b = t.branches[i];
+    const angle      = (i / t.branches.length) * Math.PI * 2 + Math.random() * 0.6;
+    const heightFrac = 0.55 + (i / t.branches.length) * 0.3 + Math.random() * 0.08;
+    const branchY    = h * heightFrac;
+    const branchLen  = 0.45 + Math.random() * 0.55;
+    b.scale.set(1, branchLen, 1);
+    // Tilt outward + slightly upward
+    b.rotation.set(0, angle, Math.PI * 0.4 + (Math.random() - 0.5) * 0.25);
+    // Anchor at the trunk surface
+    b.position.set(
+      Math.cos(angle) * 0.22,
+      branchY,
+      Math.sin(angle) * 0.22
+    );
+  }
+
+  // Foliage clusters — arrange in a roughly egg-shaped cloud above the trunk
+  const baseY        = h - 0.2;                    // overlap top of trunk
+  const foliageRad   = 1.0 + Math.random() * 0.6;
+  const foliageHt    = 1.6 + Math.random() * 1.0;
+  for (let i = 0; i < t.clusters.length; i++) {
+    const c    = t.clusters[i];
+    const yFrc = i / (t.clusters.length - 1);      // 0..1 along height
+    // Egg shape: widest in lower-middle, narrower at top
+    const ringR = foliageRad * Math.sin((1 - yFrc * 0.55) * Math.PI / 2)
+                * (0.7 + Math.random() * 0.5);
+    const angle = Math.random() * Math.PI * 2;
+    const sScale = 0.7 + Math.random() * 0.55;
+    c.scale.setScalar(sScale);
+    c.position.set(
+      Math.cos(angle) * ringR,
+      yFrc * foliageHt + (Math.random() - 0.5) * 0.25,
+      Math.sin(angle) * ringR
+    );
+  }
+  t.foliageGroup.position.y = baseY;
+
+  // Color variation per tree
+  const hue = 0.24 + Math.random() * 0.07;
+  const sat = 0.4  + Math.random() * 0.2;
+  const lit = 0.22 + Math.random() * 0.1;
+  t.foliageMat.color.setHSL(hue, sat, lit);
+
+  // Slight overall lean and random yaw — no two trees stand identical
+  t.mesh.rotation.y = Math.random() * Math.PI;
+  t.mesh.rotation.z = (Math.random() - 0.5) * 0.06;
+
+  const side = Math.random() < 0.5 ? -1 : 1;
+  t.mesh.position.x = side * (8 + Math.random() * 35);
+
+  // Re-randomize wind phase so swaying feels fresh after recycle
+  t.windPhase = Math.random() * Math.PI * 2;
+}
+for (let i = 0; i < TREE_COUNT; i++) {
+  const t = makeTree();
+  randomizeTree(t);
+  t.mesh.position.z = -STREAM_BEHIND + (i / TREE_COUNT) * STREAM_TOTAL;
+  trees.push(t);
+}
+
+const junk = [];
+const JUNK_COUNT = 35;
+function makeRockMesh() {
+  const m = new THREE.Mesh(
+    new THREE.DodecahedronGeometry(1, 0),
+    new THREE.MeshStandardMaterial({ color: 0x6e6157, flatShading: true })
+  );
+  m.castShadow = true;
+  return m;
+}
+function makeDrumMesh() {
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.4, 1.1, 12),
+    new THREE.MeshStandardMaterial({ color: 0x6b2c2c })
+  );
+  m.castShadow = true;
+  return m;
+}
+function makeJunkCarMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(2, 0.9, 3.5),
+    new THREE.MeshStandardMaterial({ color: 0x7a4226 })
+  );
+  body.position.y = 0.7;
+  body.castShadow = true;
+  g.add(body);
+  return g;
+}
+function makeJunk() {
+  const rock = makeRockMesh();    rock.visible = false; scene.add(rock);
+  const drum = makeDrumMesh();    drum.visible = false; scene.add(drum);
+  const carJ = makeJunkCarMesh(); carJ.visible = false; scene.add(carJ);
+  return { rock, drum, carJ, active: rock };
+}
+function randomizeJunk(j) {
+  j.rock.visible = false; j.drum.visible = false; j.carJ.visible = false;
+  const r = Math.random();
+  if (r < 0.5)       j.active = j.rock;
+  else if (r < 0.85) j.active = j.drum;
+  else               j.active = j.carJ;
+  j.active.visible = true;
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const x = side * (8 + Math.random() * 22);
+  if (j.active === j.rock) {
+    const r = 0.4 + Math.random() * 0.7;
+    j.rock.scale.set(r, r, r);
+    j.rock.position.set(x, r * 0.6, 0);
+    j.rock.rotation.set(Math.random(), Math.random(), Math.random());
+    j.rock.material.color.setHex(Math.random() < 0.5 ? 0x6e6157 : 0x554c46);
+  } else if (j.active === j.drum) {
+    j.drum.position.set(x, 0.55, 0);
+    j.drum.material.color.setHex(Math.random() < 0.5 ? 0x6b2c2c : 0x8a6e2c);
+  } else {
+    j.carJ.position.set(x, 0, 0);
+    j.carJ.rotation.y = Math.random() * Math.PI;
+    j.carJ.rotation.z = (Math.random() - 0.5) * 0.2;
+  }
+}
+for (let i = 0; i < JUNK_COUNT; i++) {
+  const j = makeJunk();
+  randomizeJunk(j);
+  const z = -STREAM_BEHIND + (i / JUNK_COUNT) * STREAM_TOTAL;
+  j.rock.position.z = z; j.drum.position.z = z; j.carJ.position.z = z;
+  junk.push(j);
+}
+
+const chargers = [];
+const CHARGER_SPACING = 110;
+const CHARGER_COUNT = Math.ceil(STREAM_TOTAL / CHARGER_SPACING) + 2;
+const CHARGER_LANES = [-LANE_WIDTH, 0, LANE_WIDTH];
+function makeCharger() {
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(
+    new THREE.BoxGeometry(LANE_WIDTH - 0.4, 0.05, 6),
+    new THREE.MeshStandardMaterial({ color: 0x1e40af, emissive: 0x1e40af, emissiveIntensity: 0.6 })
+  );
+  pad.position.y = 0.04;
+  g.add(pad);
+  const post = new THREE.Mesh(
+    new THREE.BoxGeometry(0.25, 4, 0.25),
+    new THREE.MeshStandardMaterial({ color: 0x444444 })
+  );
+  post.position.set(5.5, 2, 0);
+  post.castShadow = true;
+  g.add(post);
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(1.4, 1.4, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xfacc15, emissiveIntensity: 0.4 })
+  );
+  sign.position.set(5.5, 4, 0);
+  g.add(sign);
+  const glow = new THREE.Mesh(
+    new THREE.RingGeometry(1.6, 2.0, 24),
+    new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0, side: THREE.DoubleSide })
+  );
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.y = 0.06;
+  g.add(glow);
+  // Floating blue marker above the pad
+  const marker = makeWorldMarker(0x60a5fa);
+  marker.position.y = 5.5;
+  g.add(marker);
+  scene.add(g);
+  return { mesh: g, pad, glow, marker, baseMarkerY: 5.5,
+           range: (LANE_WIDTH - 0.4) / 2, wasInside: false, padX: 0 };
+}
+function randomizeCharger(c) {
+  const padX = CHARGER_LANES[Math.floor(Math.random() * CHARGER_LANES.length)];
+  c.pad.position.x = padX;
+  c.glow.position.x = padX;
+  c.marker.position.x = padX;        // marker hovers above the active lane
+  c.padX = padX;
+  c.wasInside = false;
+  c.glow.material.opacity = 0;
+}
+for (let i = 0; i < CHARGER_COUNT; i++) {
+  const c = makeCharger();
+  randomizeCharger(c);
+  c.mesh.position.z = -STREAM_BEHIND + i * CHARGER_SPACING;
+  chargers.push(c);
+}
+
+const car = new THREE.Group();
+const chassis = new THREE.Mesh(
+  new THREE.BoxGeometry(2, 0.5, 4),
+  new THREE.MeshStandardMaterial({ color: 0xa86730, roughness: 0.7, metalness: 0.2 })
+);
+chassis.position.y = 0.65;
+chassis.castShadow = true;
+car.add(chassis);
+const hood = new THREE.Mesh(
+  new THREE.BoxGeometry(1.95, 0.4, 1.3),
+  new THREE.MeshStandardMaterial({ color: 0x8a5223, roughness: 0.7 })
+);
+hood.position.set(0, 1.0, 1.15);
+hood.castShadow = true;
+car.add(hood);
+const trunkPanel = new THREE.Mesh(
+  new THREE.BoxGeometry(1.95, 0.4, 1.0),
+  new THREE.MeshStandardMaterial({ color: 0x5c3a1c, roughness: 0.8 })
+);
+trunkPanel.position.set(0, 1.0, -1.5);
+trunkPanel.castShadow = true;
+car.add(trunkPanel);
+const sideL = new THREE.Mesh(
+  new THREE.BoxGeometry(0.15, 0.55, 2.6),
+  new THREE.MeshStandardMaterial({ color: 0xa86730 })
+);
+sideL.position.set(-0.92, 1.05, 0);
+sideL.castShadow = true;
+car.add(sideL);
+const sideR = sideL.clone();
+sideR.position.x = 0.92;
+car.add(sideR);
+const windshield = new THREE.Mesh(
+  new THREE.BoxGeometry(1.6, 0.6, 0.08),
+  new THREE.MeshStandardMaterial({ color: 0x60a5d4, transparent: true, opacity: 0.5 })
+);
+windshield.position.set(0, 1.5, 0.55);
+windshield.rotation.x = -0.25;
+car.add(windshield);
+function makeHeadlight(x) {
+  const h = new THREE.Mesh(
+    new THREE.SphereGeometry(0.18, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0xfff5b0, emissive: 0xfff5b0, emissiveIntensity: 0.6 })
+  );
+  h.position.set(x, 0.85, 1.95);
+  return h;
+}
+car.add(makeHeadlight(-0.6), makeHeadlight(0.6));
+const exhaust = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.08, 0.08, 0.6, 8),
+  new THREE.MeshStandardMaterial({ color: 0x4a4a4a, metalness: 0.6, roughness: 0.3 })
+);
+exhaust.rotation.x = Math.PI / 2;
+exhaust.position.set(0.7, 0.6, -2.2);
+car.add(exhaust);
+function makeWheel(x, z, mismatch) {
+  const w = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.45, 0.32, 14),
+    new THREE.MeshStandardMaterial({ color: mismatch ? 0x5a5a5a : 0x1a1a1a, roughness: 0.9 })
+  );
+  w.rotation.z = Math.PI / 2;
+  w.position.set(x, 0.45, z);
+  w.castShadow = true;
+  return w;
+}
+const wheelFL = makeWheel(-1.05,  1.3, false);
+const wheelFR = makeWheel( 1.05,  1.3, true);
+const wheelRL = makeWheel(-1.05, -1.3, false);
+const wheelRR = makeWheel( 1.05, -1.3, false);
+const frontAxle = new THREE.Group();
+frontAxle.add(wheelFL); frontAxle.add(wheelFR);
+car.add(frontAxle, wheelRL, wheelRR);
+
+// — Alien driver —
+// Bigger cyclops dome eye, twin antennae, slimy green skin, noodle arms.
+// IMPORTANT: keep the variable names `robot`, `eye`, `eyeMat`, `antenna`,
+// `statusLight`, `statusMat` — the mood-color shift, status-light pulse,
+// and ejection animation all reference them by name. New parts (mouth,
+// antenna2, statusLight2) just get added to the same `robot` group so
+// they tumble with everything else when the alien gets ejected.
+const robot = new THREE.Group();
+const skinMat = new THREE.MeshStandardMaterial({ color: 0x4ade80, metalness: 0.05, roughness: 0.55 });
+const headMat = new THREE.MeshStandardMaterial({ color: 0x86efac, metalness: 0.05, roughness: 0.5 });
+
+// Pear-shaped torso (slightly tapered down) — reads more alien than a clean box
+const torso = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.6, 0.5), skinMat);
+torso.position.y = 0.3;
+torso.castShadow = true;
+robot.add(torso);
+
+// Noodle arms — thinner + longer, reach forward toward the wheel
+const armGeo = new THREE.BoxGeometry(0.1, 0.1, 0.7);
+const armL = new THREE.Mesh(armGeo, skinMat);
+armL.position.set(-0.28, 0.5, 0.32);
+armL.castShadow = true;
+robot.add(armL);
+const armR = armL.clone();
+armR.position.x = 0.28;
+robot.add(armR);
+
+// Tiny three-finger claws on each arm tip — a few small cubes for character
+const clawMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.7 });
+function makeClaw(x) {
+  const claw = new THREE.Group();
+  for (let i = -1; i <= 1; i++) {
+    const finger = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.12), clawMat);
+    finger.position.set(i * 0.05, 0, 0.06);
+    claw.add(finger);
+  }
+  claw.position.set(x, 0.5, 0.7);
+  return claw;
+}
+robot.add(makeClaw(-0.28));
+robot.add(makeClaw(0.28));
+
+// Bulbous head — slightly bigger, lighter green so the eye dome stands out
+const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.55), headMat);
+head.position.y = 0.95;
+head.castShadow = true;
+robot.add(head);
+
+// Big cyclops dome eye — was a thin rectangle, now a big glowing sphere.
+// Keeps `eyeMat` so the mood-driven color shift (cyan→yellow→red) still works.
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x22d3ee, emissive: 0x22d3ee, emissiveIntensity: 1.1 });
+const eye = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), eyeMat);
+eye.position.set(0, 1.0, 0.32);
+robot.add(eye);
+
+// Tiny pupil floating inside the dome — subtle but adds personality
+const pupil = new THREE.Mesh(
+  new THREE.SphereGeometry(0.05, 10, 8),
+  new THREE.MeshStandardMaterial({ color: 0x0a0a0a })
+);
+pupil.position.set(0, 1.0, 0.48);
+robot.add(pupil);
+
+// Tiny dark mouth slit
+const mouth = new THREE.Mesh(
+  new THREE.BoxGeometry(0.16, 0.03, 0.04),
+  new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.9 })
+);
+mouth.position.set(0, 0.78, 0.31);
+robot.add(mouth);
+
+// Twin antennae — wonky, asymmetric, both glow + pulse with mood by sharing statusMat.
+// Original `antenna` and `statusLight` are kept (renderer-visible names referenced
+// elsewhere); a second pair is added for the alien feeler look.
+const antennaMat = new THREE.MeshStandardMaterial({ color: 0x166534, roughness: 0.6 });
+const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.4, 6), antennaMat);
+antenna.position.set(-0.16, 1.45, 0);
+antenna.rotation.z = -0.28;
+robot.add(antenna);
+const antenna2 = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.34, 6), antennaMat);
+antenna2.position.set(0.16, 1.42, 0);
+antenna2.rotation.z = 0.28;
+robot.add(antenna2);
+
+const statusMat = new THREE.MeshStandardMaterial({ color: 0x22ff44, emissive: 0x22ff44, emissiveIntensity: 1.2 });
+const statusLight = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), statusMat);
+statusLight.position.set(-0.21, 1.62, 0);
+robot.add(statusLight);
+const statusLight2 = new THREE.Mesh(new THREE.SphereGeometry(0.07, 10, 8), statusMat);
+statusLight2.position.set(0.20, 1.58, 0);
+robot.add(statusLight2);
+
+robot.position.set(-0.35, 1.0, -0.1);
+car.add(robot);
+scene.add(car);
+
+const passengerInCar = new THREE.Group();
+const pCarBody = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.18, 0.22, 0.55, 8),
+  new THREE.MeshStandardMaterial({ color: 0x4a8af0, roughness: 0.7 })
+);
+pCarBody.position.y = 0.28;
+pCarBody.castShadow = true;
+passengerInCar.add(pCarBody);
+const pCarHead = new THREE.Mesh(
+  new THREE.SphereGeometry(0.16, 12, 8),
+  new THREE.MeshStandardMaterial({ color: 0xf5d0a0 })
+);
+pCarHead.position.y = 0.65;
+pCarHead.castShadow = true;
+passengerInCar.add(pCarHead);
+passengerInCar.position.set(0.35, 1.0, -0.1);
+passengerInCar.visible = false;
+car.add(passengerInCar);
+
+// Shared factory for the floating downward-arrow markers used by
+// civilians, houses and charge pads. Inner cone points down; outer
+// group spins freely around Y for a subtle "look here" animation.
+function makeWorldMarker(color) {
+  const g = new THREE.Group();
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(0.4, 0.85, 4),
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.85, depthWrite: false })
+  );
+  cone.rotation.x = Math.PI; // point tip downward
+  g.add(cone);
+  return g;
+}
+
+const civilians = [];
+const CIVILIAN_COUNT  = 10;
+const CIVILIAN_SIDE_X = 8.5;
+const PICKUP_LAT      = 6;
+const PICKUP_LONG     = 5;
+function makeCivilian() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.35, 1.2, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a8af0, roughness: 0.7 })
+  );
+  body.position.y = 0.6;
+  body.castShadow = true;
+  g.add(body);
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.25, 12, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf5d0a0 })
+  );
+  head.position.y = 1.45;
+  head.castShadow = true;
+  g.add(head);
+  const beacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.15, 6, 8),
+    new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.35, depthWrite: false })
+  );
+  beacon.position.y = 3;
+  g.add(beacon);
+  // Floating marker (downward arrow) — visible in 3D world to spot from afar
+  const marker = makeWorldMarker(0x4ade80);
+  marker.position.y = 4.2;
+  g.add(marker);
+  scene.add(g);
+  return { mesh: g, body, head, beacon, marker, baseMarkerY: 4.2 };
+}
+function randomizeCivilian(c) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  c.mesh.position.x = side * (CIVILIAN_SIDE_X + (Math.random() - 0.5) * 1.5);
+  const colors = [0x4a8af0, 0xef4444, 0xa855f7, 0xfbbf24, 0x14b8a6, 0xf472b6];
+  c.body.material.color.setHex(colors[Math.floor(Math.random() * colors.length)]);
+  c.mesh.rotation.y = Math.random() * Math.PI * 2;
+  c.beacon.material.opacity = 0.35;
+  c.mesh.visible = true;
+  // (Visibility in Speed Mode is handled at the streaming-call site + restart/mode-switch
+  // helpers — we can't reference `state` here because randomizeCivilian is called from the
+  // init loop below, BEFORE `state` is declared further down the file.)
+}
+for (let i = 0; i < CIVILIAN_COUNT; i++) {
+  const c = makeCivilian();
+  randomizeCivilian(c);
+  c.mesh.position.z = -STREAM_BEHIND + (i + 0.5) * (STREAM_TOTAL / CIVILIAN_COUNT);
+  civilians.push(c);
+}
+
+const houses = [];
+const HOUSE_COUNT  = 10;
+const HOUSE_SIDE_X = 11;
+const DROPOFF_LAT  = 7;
+const DROPOFF_LONG = 6;
+function makeHouse() {
+  const g = new THREE.Group();
+  const walls = new THREE.Mesh(
+    new THREE.BoxGeometry(3.2, 2.2, 3.2),
+    new THREE.MeshStandardMaterial({ color: 0xd2a06b, roughness: 0.85 })
+  );
+  walls.position.y = 1.1;
+  walls.castShadow = true;
+  walls.receiveShadow = true;
+  g.add(walls);
+  const roof = new THREE.Mesh(
+    new THREE.ConeGeometry(2.5, 1.3, 4),
+    new THREE.MeshStandardMaterial({ color: 0x8a3a26, roughness: 0.7, emissive: 0xfde047, emissiveIntensity: 0 })
+  );
+  roof.rotation.y = Math.PI / 4;
+  roof.position.y = 2.85;
+  roof.castShadow = true;
+  g.add(roof);
+  const door = new THREE.Mesh(
+    new THREE.BoxGeometry(0.7, 1.2, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0x4a2c14 })
+  );
+  door.position.set(0, 0.6, 1.62);
+  g.add(door);
+  // Floating yellow marker above the roof
+  const marker = makeWorldMarker(0xfde047);
+  marker.position.y = 5.0;
+  g.add(marker);
+  scene.add(g);
+  return { mesh: g, walls, roof, door, marker, baseMarkerY: 5.0 };
+}
+function randomizeHouse(h) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  h.mesh.position.x = side * (HOUSE_SIDE_X + (Math.random() - 0.5) * 1.5);
+  h.mesh.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+  const wallColors = [0xd2a06b, 0xe4d9c0, 0xc69584, 0xa6b18f, 0xb89a7a];
+  const roofColors = [0x8a3a26, 0x4f6273, 0x3a4a3a, 0x6b3838, 0x5a4f3a];
+  h.walls.material.color.setHex(wallColors[Math.floor(Math.random() * wallColors.length)]);
+  h.roof.material.color.setHex(roofColors[Math.floor(Math.random() * roofColors.length)]);
+  h.mesh.visible = true;
+  // (Visibility in Speed Mode handled at the streaming call site + start{Mode}/restart — see randomizeCivilian's note.)
+}
+for (let i = 0; i < HOUSE_COUNT; i++) {
+  const h = makeHouse();
+  randomizeHouse(h);
+  h.mesh.position.z = -STREAM_BEHIND + (i + 0.5) * (STREAM_TOTAL / HOUSE_COUNT) + 22;
+  houses.push(h);
+}
+
+// — Speed Mode tunables —
+// Speed Mode is its own arcade lane: the car starts already fast and the top
+// speed ramps over SPEED_MODE_RAMP_SECONDS up to a hard cap so physics don't
+// get silly. None of these values affect Normal Mode — every Speed Mode code
+// path is gated on `state.gameMode === 'speed'`. These constants live HERE
+// (not next to the other speed/income constants further down) because the
+// pedestrian pool init loop right below needs PEDESTRIAN_COUNT, and `const`s
+// are not hoisted — referencing them before declaration is a ReferenceError.
+const SPEED_MODE_INITIAL_SPEED = 100;   // state.car.speed at the moment Speed Mode starts
+const SPEED_MODE_START_TOP     = 140;   // top speed at minute 0
+const SPEED_MODE_MAX_TOP       = 240;   // hard cap (chaotic-fast)
+const SPEED_MODE_RAMP_SECONDS  = 180;   // seconds to interpolate from start_top to max_top
+const SPEED_MODE_MIN_HIT_SPEED = 8;     // below this, pedestrians don't get knocked over (so you can creep through)
+const PEDESTRIAN_COUNT         = 14;
+const PEDESTRIAN_HIT_LAT       = 1.5;   // lateral half-width of the car's hit box
+const PEDESTRIAN_HIT_LONG      = 1.6;   // longitudinal half-length of the car's hit box
+const PEDESTRIAN_FLY_TIME      = 1.6;   // seconds of cartoon flight before recycling
+
+// — Pedestrian pool (Speed Mode only) —
+// Cartoon people that spawn on/near the road and get cartoon-flung when hit.
+// Completely separate from `civilians` so the ride-share pickup logic isn't
+// affected. Hidden in Normal Mode (only made visible by startSpeedMode()).
+const pedestrians = [];
+const PEDESTRIAN_COLORS = [0xef4444, 0x3b82f6, 0xf59e0b, 0x10b981, 0xa855f7, 0xec4899, 0x14b8a6, 0xf97316];
+function makePedestrian() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 0.35, 1.2, 8),
+    new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.7 })
+  );
+  body.position.y = 0.6;
+  body.castShadow = true;
+  g.add(body);
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.25, 12, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf5d0a0 })
+  );
+  head.position.y = 1.45;
+  head.castShadow = true;
+  g.add(head);
+  scene.add(g);
+  g.visible = false;   // hidden until Speed Mode is entered
+  return {
+    mesh: g, body, head,
+    flying: false, flyTimer: 0,
+    vx: 0, vy: 0, vz: 0,
+    spinX: 0, spinY: 0, spinZ: 0
+  };
+}
+function recyclePedestrian(p, behindCar) {
+  // Reset to standing-still state at a new road position. Used both at start
+  // (initial scatter) and after a flying timeout / streaming behind.
+  p.flying = false;
+  p.flyTimer = 0;
+  p.vx = p.vy = p.vz = 0;
+  p.spinX = p.spinY = p.spinZ = 0;
+  p.mesh.position.y = 0;
+  p.mesh.rotation.set(0, 0, 0);
+  // Random x across the road + a bit of shoulder, roughly -6 to +6
+  p.mesh.position.x = (Math.random() - 0.5) * 12;
+  // Distance ahead of the car. Min 70m so even at the SPEED_MODE_MAX_TOP cap
+  // (240 m/s) the player gets ~0.3s to react — tight but fair. At Speed Mode
+  // start (initial 100 m/s) that's 0.7s, plenty.
+  if (behindCar) {
+    p.mesh.position.z = state.car.z - STREAM_BEHIND - Math.random() * 30;
+  } else {
+    p.mesh.position.z = state.car.z + 70 + Math.random() * (STREAM_AHEAD - 90);
+  }
+  p.body.material.color.setHex(PEDESTRIAN_COLORS[Math.floor(Math.random() * PEDESTRIAN_COLORS.length)]);
+  // Visibility tracks gameMode so streaming during a mode swap doesn't reveal them in Normal Mode
+  p.mesh.visible = (state.gameMode === 'speed');
+}
+for (let i = 0; i < PEDESTRIAN_COUNT; i++) {
+  pedestrians.push(makePedestrian());
+}
+
+const BILLBOARD_ADS = [
+  { text: 'CHARGE-O-MATIC', bg: '#fbbf24', fg: '#7c2d12' },
+  { text: 'BOT OIL',        bg: '#0f172a', fg: '#fde047' },
+  { text: 'UPGRADE GARAGE', bg: '#dc2626', fg: '#fef9c3' },
+  { text: 'SPARK Cola',     bg: '#3b82f6', fg: '#fef9c3' },
+  { text: 'JUNK BUSTER',    bg: '#84cc16', fg: '#1a2e05' },
+  { text: 'ROBOT WASH',     bg: '#a855f7', fg: '#fef9c3' },
+];
+function makeBillboardTexture(text, bgColor, fgColor) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 256;
+  const ctx2d = canvas.getContext('2d');
+  ctx2d.fillStyle = bgColor;
+  ctx2d.fillRect(0, 0, canvas.width, canvas.height);
+  ctx2d.strokeStyle = fgColor;
+  ctx2d.lineWidth = 12;
+  ctx2d.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+  ctx2d.fillStyle = fgColor;
+  ctx2d.fillRect(20, 20, 24, 8);
+  ctx2d.fillRect(canvas.width - 44, 20, 24, 8);
+  ctx2d.fillRect(20, canvas.height - 28, 24, 8);
+  ctx2d.fillRect(canvas.width - 44, canvas.height - 28, 24, 8);
+  let fontSize = 80;
+  ctx2d.font = `bold ${fontSize}px sans-serif`;
+  while (ctx2d.measureText(text).width > canvas.width - 80 && fontSize > 30) {
+    fontSize -= 4;
+    ctx2d.font = `bold ${fontSize}px sans-serif`;
+  }
+  ctx2d.fillStyle = fgColor;
+  ctx2d.textAlign = 'center';
+  ctx2d.textBaseline = 'middle';
+  ctx2d.fillText(text, canvas.width / 2, canvas.height / 2);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.minFilter = THREE.LinearFilter;
+  return tex;
+}
+const billboardTextures = BILLBOARD_ADS.map(ad => makeBillboardTexture(ad.text, ad.bg, ad.fg));
+
+const billboards = [];
+const BILLBOARD_COUNT  = 6;
+const BILLBOARD_SIDE_X = 18;
+function makeBillboard() {
+  const g = new THREE.Group();
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x4a4a4a, metalness: 0.4 });
+  for (const x of [-2.5, 2.5]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.3, 6.5, 0.3), postMat);
+    post.position.set(x, 3.25, 0);
+    post.castShadow = true;
+    g.add(post);
+  }
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(6.4, 3.4, 0.15),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+  );
+  frame.position.set(0, 6, -0.05);
+  g.add(frame);
+  const panel = new THREE.Mesh(
+    new THREE.PlaneGeometry(6, 3),
+    new THREE.MeshStandardMaterial({ map: billboardTextures[0], side: THREE.DoubleSide, roughness: 0.85 })
+  );
+  panel.position.set(0, 6, 0.1);
+  g.add(panel);
+  scene.add(g);
+  return { mesh: g, panel };
+}
+function randomizeBillboard(b) {
+  const side = Math.random() < 0.5 ? -1 : 1;
+  b.mesh.position.x = side * (BILLBOARD_SIDE_X + (Math.random() - 0.5) * 3);
+  b.mesh.rotation.y = side > 0 ? -Math.PI * 3 / 4 : Math.PI * 3 / 4;
+  b.panel.material.map = billboardTextures[Math.floor(Math.random() * billboardTextures.length)];
+  b.panel.material.needsUpdate = true;
+  b.mesh.visible = true;
+}
+for (let i = 0; i < BILLBOARD_COUNT; i++) {
+  const b = makeBillboard();
+  randomizeBillboard(b);
+  b.mesh.position.z = -STREAM_BEHIND + (i + 0.5) * (STREAM_TOTAL / BILLBOARD_COUNT) + 60;
+  billboards.push(b);
+}
+
+// NPC traffic was removed for the Alien Mood update — will return later.
+
+// ============================================================
+// OBJECTIVE MARKER — single floating arrow in 3D world that
+// highlights wherever the current target is. Color changes
+// with target type (civilian / house / charger).
+// ============================================================
+const objMarker = new THREE.Group();
+const objMarkerCone = new THREE.Mesh(
+  new THREE.ConeGeometry(0.7, 1.4, 4),
+  new THREE.MeshStandardMaterial({
+    color: 0x4ade80, emissive: 0x4ade80, emissiveIntensity: 0.9,
+    transparent: true, opacity: 0.9
+  })
+);
+objMarkerCone.rotation.x = Math.PI;       // tip pointing down at target
+objMarkerCone.rotation.y = Math.PI / 4;   // diamond orientation
+objMarker.add(objMarkerCone);
+objMarker.visible = false;
+scene.add(objMarker);
+
+function showPayout(amount) {
+  const el = document.getElementById('payout');
+  el.textContent = '+$' + amount;
+  el.style.opacity = '1';
+  el.style.top = '42%';
+  requestAnimationFrame(() => { el.style.top = '32%'; });
+  clearTimeout(showPayout._t);
+  showPayout._t = setTimeout(() => { el.style.opacity = '0'; }, 800);
+}
+function flashCharged() {
+  const el = document.getElementById('charged');
+  el.style.opacity = '1';
+  clearTimeout(flashCharged._t);
+  flashCharged._t = setTimeout(() => { el.style.opacity = '0'; }, 700);
+}
+function flashCrash() {
+  const text  = document.getElementById('crash');
+  const flash = document.getElementById('crashFlash');
+  text.style.opacity  = '1';
+  flash.style.opacity = '0.55';
+  clearTimeout(flashCrash._t1);
+  clearTimeout(flashCrash._t2);
+  flashCrash._t1 = setTimeout(() => { flash.style.opacity = '0'; }, 200);
+  flashCrash._t2 = setTimeout(() => { text.style.opacity  = '0'; }, 500);
+}
+
+function openGarage() {
+  state.paused = true;
+  document.getElementById('garageOverlay').style.display = 'flex';
+  updateGarageUI();
+}
+function closeGarage() {
+  state.paused = false;
+  document.getElementById('garageOverlay').style.display = 'none';
+}
+function updateGarageUI() {
+  document.getElementById('garageMoney').textContent = state.money;
+  document.getElementById('garageUpgLv').textContent = state.speedUpgrade;
+  const next = UPGRADE_COSTS[state.speedUpgrade];
+  const btn = document.getElementById('buyUpgradeBtn');
+  const msg = document.getElementById('garageMsg');
+  if (next === undefined) {
+    btn.textContent = 'MAX LEVEL REACHED';
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+    msg.innerHTML = '&nbsp;';
+  } else {
+    btn.innerHTML = 'Upgrade Engine — $<span id="garageCost">' + next + '</span>';
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.style.cursor = 'pointer';
+    msg.innerHTML = state.money < next
+      ? 'Not enough money — earn more by delivering civilians.'
+      : '&nbsp;';
+  }
+}
+function buyUpgrade() {
+  const next = UPGRADE_COSTS[state.speedUpgrade];
+  if (next === undefined) return;
+  if (state.money < next) {
+    document.getElementById('garageMsg').textContent =
+      'Not enough money — earn more by delivering civilians.';
+    return;
+  }
+  state.money -= next;
+  state.speedUpgrade += 1;
+  saveProgress();
+  updateGarageUI();
+}
+function comingSoon() {
+  alert('Coming soon — color and driver upgrades are planned for a future update!');
+}
+window.openGarage  = openGarage;
+window.closeGarage = closeGarage;
+window.buyUpgrade  = buyUpgrade;
+window.comingSoon  = comingSoon;
+
+// — Pause + Main Menu —
+// The pause system reuses `state.paused` (which the garage already uses) so
+// the existing early-return at the top of update() freezes everything in one
+// place: car movement, mood drain, passive income, speed-level escalation,
+// streaming, civilians/houses/billboards, sad-mood polish, world markers.
+// Render keeps running so the scene stays visible while paused.
+function openPause() {
+  // Don't pause during ejection or after game over — the game-over overlay
+  // owns that state and Pause would just stack confusingly on top.
+  if (state.ejecting || state.gameOver) return;
+  // If garage is already open, treat Pause as a no-op (garage already paused).
+  if (document.getElementById('garageOverlay').style.display === 'flex') return;
+  state.paused = true;
+  document.getElementById('pauseOverlay').style.display = 'flex';
+}
+function closePause() {
+  document.getElementById('pauseOverlay').style.display = 'none';
+  // Only unpause if no other overlay needs us paused (e.g. main menu still open).
+  if (document.getElementById('mainMenuOverlay').style.display !== 'flex' &&
+      document.getElementById('garageOverlay').style.display  !== 'flex') {
+    state.paused = false;
+  }
+}
+function openMainMenu() {
+  // Pause must already be set (we get here from the Pause overlay), but be defensive.
+  state.paused = true;
+  document.getElementById('pauseOverlay').style.display = 'none';
+  document.getElementById('mainMenuOverlay').style.display = 'flex';
+  // Continue button only makes sense when there's an in-progress game to return to.
+  document.getElementById('continueBtn').style.display = state.gameOver ? 'none' : 'block';
+}
+function closeMainMenu() {
+  document.getElementById('mainMenuOverlay').style.display = 'none';
+}
+function continueGame() {
+  // Resume the existing run — money, mood, upgrade level, position untouched.
+  closeMainMenu();
+  state.paused = false;
+}
+function startNormalMode() {
+  // Set mode FIRST — restart() reads state.gameMode to decide civilian/house/
+  // pedestrian visibility, so the order matters.
+  state.gameMode = 'normal';
+  closeMainMenu();
+  restart();
+}
+function startSpeedMode() {
+  state.gameMode = 'speed';
+  closeMainMenu();
+  restart();                                         // resets per-run state, hides civilians/houses, recycles pedestrians as visible
+  state.speedModeStartTime = performance.now();      // start the ramp clock NOW so minute 0 begins here
+  state.car.speed = SPEED_MODE_INITIAL_SPEED;        // start moving fast — no slow ramp from 0
+  // Center-screen flash so the mode change is obvious
+  const note = document.getElementById('crash');
+  if (note) {
+    note.textContent = 'SPEED MODE!';
+    note.style.color = '#c4b5fd';
+    note.style.opacity = '1';
+    clearTimeout(startSpeedMode._t);
+    startSpeedMode._t = setTimeout(() => { note.style.opacity = '0'; }, 1000);
+  }
+}
+window.openPause       = openPause;
+window.closePause      = closePause;
+window.openMainMenu    = openMainMenu;
+window.closeMainMenu   = closeMainMenu;
+window.continueGame    = continueGame;
+window.startNormalMode = startNormalMode;
+window.startSpeedMode  = startSpeedMode;
+// Note: function declarations are already globally accessible from inline
+// onclick attributes — these assignments just make the wiring explicit and
+// match the pattern openGarage / buyUpgrade / restart use elsewhere.
+
+addEventListener('keydown', e => {
+  // Shortcut layer: Esc closes whichever overlay is on top, P toggles pause.
+  // Order matters: deeper-stacked overlays close first.
+  const garageOpen   = document.getElementById('garageOverlay').style.display   === 'flex';
+  const mainMenuOpen = document.getElementById('mainMenuOverlay').style.display === 'flex';
+  const pauseOpen    = document.getElementById('pauseOverlay').style.display    === 'flex';
+  if (e.key === 'Escape') {
+    if (garageOpen)        closeGarage();
+    else if (mainMenuOpen) { closeMainMenu(); openPause(); }   // bounce back to Pause
+    else if (pauseOpen)    closePause();
+    else                   openPause();                        // open it
+  } else if (e.key.toLowerCase() === 'p') {
+    if (state.ejecting || state.gameOver) return;
+    if (pauseOpen)         closePause();
+    else if (!garageOpen && !mainMenuOpen) openPause();
+  }
+});
+
+const Music = (() => {
+  let ctx = null, masterGain = null;
+  let scheduler = null, nextNoteTime = 0, stepIndex = 0;
+  let on = true;
+  const BPM = 124;
+  const STEPS_PER_BEAT = 2;
+  const BEATS_PER_BAR  = 4;
+  const BARS = 4;
+  const TOTAL_STEPS = STEPS_PER_BEAT * BEATS_PER_BAR * BARS;
+  const STEP_DURATION = 60 / BPM / STEPS_PER_BEAT;
+  const NOTES = {
+    F2:87.31, G2:98.00, A2:110.00, B2:123.47,
+    C3:130.81, D3:146.83, E3:164.81, F3:174.61, G3:196.00,
+    A3:220.00, B3:246.94,
+    C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00,
+    A4:440.00, B4:493.88,
+    C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99
+  };
+  const BASS_PATTERN = [
+    'C3', null, 'G2', null, 'C3', null, 'G2', null,
+    'A2', null, 'E3', null, 'A2', null, 'E3', null,
+    'F2', null, 'C3', null, 'F2', null, 'C3', null,
+    'G2', null, 'D3', null, 'G2', null, 'B2', null,
+  ];
+  const LEAD_PATTERN = [
+    'C5', 'E5', 'G5', 'E5', 'C5', 'E5', 'G5', 'E5',
+    'A4', 'C5', 'E5', 'C5', 'A4', 'C5', 'E5', 'C5',
+    'F4', 'A4', 'C5', 'A4', 'F4', 'A4', 'C5', 'A4',
+    'G4', 'B4', 'D5', 'B4', 'G4', 'B4', 'D5', 'F5',
+  ];
+  function init() {
+    if (ctx) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 0.16;
+      masterGain.connect(ctx.destination);
+    } catch (e) { console.warn('Audio not available:', e); }
+  }
+  function playOsc(freq, time, duration, type, volume) {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, time);
+    g.gain.linearRampToValueAtTime(volume, time + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, time + duration);
+    o.connect(g).connect(masterGain);
+    o.start(time); o.stop(time + duration + 0.05);
+  }
+  function playKick(time) {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(120, time);
+    o.frequency.exponentialRampToValueAtTime(40, time + 0.13);
+    g.gain.setValueAtTime(0.45, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.15);
+    o.connect(g).connect(masterGain);
+    o.start(time); o.stop(time + 0.2);
+  }
+  function playSnare(time) {
+    const sr = ctx.sampleRate;
+    const buf = ctx.createBuffer(1, sr * 0.2, sr);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() - 0.5) * 2;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 1500;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.18, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.12);
+    noise.connect(filter).connect(g).connect(masterGain);
+    noise.start(time); noise.stop(time + 0.15);
+  }
+  function scheduleStep(step, time) {
+    const stepInBar = step % 8;
+    if (stepInBar === 0 || stepInBar === 4) playKick(time);
+    if (stepInBar === 2 || stepInBar === 6) playSnare(time);
+    const bn = BASS_PATTERN[step];
+    if (bn) playOsc(NOTES[bn], time, 0.18, 'sawtooth', 0.16);
+    const ln = LEAD_PATTERN[step];
+    if (ln) playOsc(NOTES[ln], time, 0.12, 'square', 0.09);
+  }
+  function tick() {
+    if (!ctx) return;
+    while (nextNoteTime < ctx.currentTime + 0.2) {
+      scheduleStep(stepIndex, nextNoteTime);
+      nextNoteTime += STEP_DURATION;
+      stepIndex = (stepIndex + 1) % TOTAL_STEPS;
+    }
+  }
+  function start() {
+    if (!on) return;
+    init();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    if (scheduler) return;
+    nextNoteTime = ctx.currentTime + 0.05;
+    stepIndex = 0;
+    masterGain.gain.setValueAtTime(0.16, ctx.currentTime);
+    scheduler = setInterval(tick, 25);
+  }
+  function stop() {
+    if (scheduler) { clearInterval(scheduler); scheduler = null; }
+    if (masterGain) masterGain.gain.setValueAtTime(0, ctx.currentTime);
+  }
+  function toggle() {
+    on = !on;
+    if (on) start(); else stop();
+    return on;
+  }
+  return { start, stop, toggle, get isOn() { return on; } };
+})();
+function toggleMusic() {
+  const onNow = Music.toggle();
+  const btn = document.getElementById('musicBtn');
+  btn.textContent = onNow ? 'MUSIC: ON' : 'MUSIC: OFF';
+  btn.style.color = onNow ? '#a5b4fc' : '#64748b';
+}
+window.toggleMusic = toggleMusic;
+function startMusicOnce() {
+  Music.start();
+  removeEventListener('click', startMusicOnce);
+  removeEventListener('keydown', startMusicOnce);
+}
+addEventListener('click', startMusicOnce);
+addEventListener('keydown', startMusicOnce);
+
+const MAX_PARTICLES = 120;
+const particleGeom = new THREE.BufferGeometry();
+const particlePositions = new Float32Array(MAX_PARTICLES * 3);
+const particleColors = new Float32Array(MAX_PARTICLES * 3);
+particleGeom.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+particleGeom.setAttribute('color',    new THREE.BufferAttribute(particleColors, 3));
+const particleMat = new THREE.PointsMaterial({
+  size: 0.18, vertexColors: true, transparent: true,
+  opacity: 0.95, depthWrite: false, blending: THREE.AdditiveBlending
+});
+const sparkPoints = new THREE.Points(particleGeom, particleMat);
+scene.add(sparkPoints);
+const particleData = [];
+for (let i = 0; i < MAX_PARTICLES; i++) {
+  particleData.push({ x:0, y:-1000, z:0, vx:0, vy:0, vz:0, life:0, maxLife:1 });
+}
+const _headWorld = new THREE.Vector3();
+function spawnLeak(intensityPerSec, dt) {
+  const expected = intensityPerSec * dt;
+  const count = Math.floor(expected) + (Math.random() < (expected % 1) ? 1 : 0);
+  for (let n = 0; n < count; n++) {
+    const p = particleData.find(p => p.life <= 0);
+    if (!p) break;
+    head.getWorldPosition(_headWorld);
+    p.x = _headWorld.x + (Math.random() - 0.5) * 0.3;
+    p.y = _headWorld.y + 0.2;
+    p.z = _headWorld.z + (Math.random() - 0.5) * 0.3;
+    p.vx = (Math.random() - 0.5) * 2.0;
+    p.vy = 1.8 + Math.random() * 1.5;
+    p.vz = (Math.random() - 0.5) * 2.0;
+    p.life = 0.7 + Math.random() * 0.6;
+    p.maxLife = p.life;
+  }
+}
+function updateParticles(dt, moodRatio) {
+  const positions = particleGeom.attributes.position.array;
+  const colors    = particleGeom.attributes.color.array;
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    const p = particleData[i];
+    if (p.life > 0) {
+      p.life -= dt;
+      p.vy -= 7 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      const lifeRatio = Math.max(0, p.life / p.maxLife);
+      const heat = 1 - moodRatio;
+      colors[i*3]     = 0.4 + heat * 0.6;
+      colors[i*3 + 1] = (1 - heat * 0.7) * lifeRatio;
+      colors[i*3 + 2] = (0.6 - heat * 0.5) * lifeRatio;
+    } else { p.y = -1000; }
+    positions[i*3]     = p.x;
+    positions[i*3 + 1] = p.y;
+    positions[i*3 + 2] = p.z;
+  }
+  particleGeom.attributes.position.needsUpdate = true;
+  particleGeom.attributes.color.needsUpdate = true;
+}
+
+// — Tear particle pool —
+// Separate from sparks so they don't compete for slots and can have their own
+// physics + color. Spawn from the eye world position when mood is low.
+const MAX_TEARS = 40;
+const TEAR_THRESHOLD = 0.4;        // moodRatio below which tears start dripping
+const TEAR_RATE_AT_ZERO = 14;      // tears per second when mood is fully drained
+const tearGeom = new THREE.BufferGeometry();
+const tearPositions = new Float32Array(MAX_TEARS * 3);
+const tearColors    = new Float32Array(MAX_TEARS * 3);
+tearGeom.setAttribute('position', new THREE.BufferAttribute(tearPositions, 3));
+tearGeom.setAttribute('color',    new THREE.BufferAttribute(tearColors, 3));
+const tearMat = new THREE.PointsMaterial({
+  size: 0.14, vertexColors: true, transparent: true,
+  opacity: 0.9, depthWrite: false   // no additive blend — keep tears looking wet, not glowing
+});
+const tearPoints = new THREE.Points(tearGeom, tearMat);
+scene.add(tearPoints);
+const tearData = [];
+for (let i = 0; i < MAX_TEARS; i++) {
+  tearData.push({ x:0, y:-1000, z:0, vx:0, vy:0, vz:0, life:0, maxLife:1 });
+}
+const _eyeWorld = new THREE.Vector3();
+function spawnTears(intensityPerSec, dt) {
+  const expected = intensityPerSec * dt;
+  const count = Math.floor(expected) + (Math.random() < (expected % 1) ? 1 : 0);
+  for (let n = 0; n < count; n++) {
+    const p = tearData.find(p => p.life <= 0);
+    if (!p) break;
+    eye.getWorldPosition(_eyeWorld);
+    p.x = _eyeWorld.x + (Math.random() - 0.5) * 0.08;
+    p.y = _eyeWorld.y - 0.05;
+    p.z = _eyeWorld.z + 0.02;
+    // Tears mostly fall + slight outward dribble; very little forward velocity
+    p.vx = (Math.random() - 0.5) * 0.6;
+    p.vy = -0.3 - Math.random() * 0.4;
+    p.vz = (Math.random() - 0.5) * 0.4;
+    p.life = 0.9 + Math.random() * 0.5;
+    p.maxLife = p.life;
+  }
+}
+function updateTears(dt) {
+  const positions = tearGeom.attributes.position.array;
+  const colors    = tearGeom.attributes.color.array;
+  for (let i = 0; i < MAX_TEARS; i++) {
+    const p = tearData[i];
+    if (p.life > 0) {
+      p.life -= dt;
+      p.vy -= 9.5 * dt;          // gravity (a bit lighter than sparks)
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      const lifeRatio = Math.max(0, p.life / p.maxLife);
+      // Bright cyan-blue, fading to deeper blue as it falls
+      colors[i*3]     = 0.35 * lifeRatio;
+      colors[i*3 + 1] = 0.75 * lifeRatio;
+      colors[i*3 + 2] = 1.0  * lifeRatio;
+    } else { p.y = -1000; }
+    positions[i*3]     = p.x;
+    positions[i*3 + 1] = p.y;
+    positions[i*3 + 2] = p.z;
+  }
+  tearGeom.attributes.position.needsUpdate = true;
+  tearGeom.attributes.color.needsUpdate = true;
+}
+
+function streamObject(zHolder, randomizeFn) {
+  const dz = zHolder.position.z - state.car.z;
+  if (dz < -STREAM_BEHIND) {
+    zHolder.position.z += STREAM_TOTAL;
+    if (randomizeFn) randomizeFn();
+  } else if (dz > STREAM_AHEAD) {
+    zHolder.position.z -= STREAM_TOTAL;
+    if (randomizeFn) randomizeFn();
+  }
+}
+
+// — Speed Mode: pedestrian streaming + cartoon hit physics —
+// Called from update() only when state.gameMode === 'speed'. For each
+// pedestrian: if they're already flying, advance the gravity arc + spin and
+// recycle when the timer runs out (or they fall below ground). If they're
+// standing, run a hit check against the car's bounding box; outside that, do
+// the usual streaming so they keep appearing ahead of the player.
+function updatePedestrians(dt) {
+  for (const p of pedestrians) {
+    if (p.flying) {
+      // Cartoon flight — arc, spin, recycle
+      p.vy -= 14 * dt;
+      p.mesh.position.x += p.vx * dt;
+      p.mesh.position.y += p.vy * dt;
+      p.mesh.position.z += p.vz * dt;
+      p.mesh.rotation.x += p.spinX * dt;
+      p.mesh.rotation.y += p.spinY * dt;
+      p.mesh.rotation.z += p.spinZ * dt;
+      p.flyTimer -= dt;
+      if (p.flyTimer <= 0 || p.mesh.position.y < -8) {
+        recyclePedestrian(p);
+      }
+      continue;
+    }
+    // Standing pedestrian — first check if the car just hit them.
+    // Anti-tunneling: at top speed (240 m/s) the car moves ~12m per frame, so
+    // a 1.6m hit box would let pedestrians slip through. Stretch the
+    // longitudinal hit zone to cover the segment the car traveled this frame.
+    const dx = state.car.x - p.mesh.position.x;
+    const dz = state.car.z - p.mesh.position.z;
+    const hitLong = PEDESTRIAN_HIT_LONG + Math.abs(state.car.speed) * dt;
+    if (Math.abs(dx) < PEDESTRIAN_HIT_LAT &&
+        Math.abs(dz) < hitLong &&
+        Math.abs(state.car.speed) > SPEED_MODE_MIN_HIT_SPEED) {
+      // HIT — kick into cartoon flight. Velocity blends a chunk of car momentum
+      // (so they fly forward roughly with the car) plus randomness for chaos.
+      p.flying = true;
+      p.flyTimer = PEDESTRIAN_FLY_TIME;
+      const carSign = state.car.speed >= 0 ? 1 : -1;
+      const fwdShare = state.car.speed * 0.55;       // share of car momentum
+      p.vx = (Math.random() - 0.5) * 6 + Math.sin(state.car.heading) * fwdShare;
+      p.vy = 7 + Math.random() * 4;                  // big upward kick
+      p.vz = Math.cos(state.car.heading) * fwdShare + carSign * (3 + Math.random() * 3);
+      p.spinX = (Math.random() - 0.5) * 18;
+      p.spinY = (Math.random() - 0.5) * 18;
+      p.spinZ = (Math.random() - 0.5) * 18;
+      continue;
+    }
+    // Not hit — stream them forward when they pass the car
+    const dzRel = p.mesh.position.z - state.car.z;
+    if (dzRel < -STREAM_BEHIND) {
+      recyclePedestrian(p);                          // moves them ahead and randomizes
+    } else if (dzRel > STREAM_AHEAD + 50) {
+      recyclePedestrian(p, true);                    // very rare — only if car reversed for a long time
+    }
+  }
+}
+
+const state = {
+  car: { x: 0, z: 0, heading: 0, speed: 0 },
+  mood: 100,                              // was "battery" — now alien happiness
+  distance: 0, gameOver: false, paused: false,
+  gameMode: 'normal',                     // 'normal' | 'speed' — gates speed-ramp + pedestrian logic
+  speedModeStartTime: 0,                  // performance.now() timestamp when Speed Mode was started; drives the ramp
+  driftDir: 0, driftTimer: 0, keys: {}, steerAngle: 0, scraping: false,
+  speedLevel: 1, fov: 62,
+  money: 0, moneyFrac: 0, speedUpgrade: 0, passenger: null,
+  // Ejection animation state — when mood hits 0, the alien yeets out of the car.
+  ejecting: false,
+  ejectTimer: 0,
+  ejectMaxTime: 1.5,
+  lostMoney: 0
+};
+const BASE_MAX_SPEED      = 80;
+const SPEED_PER_LEVEL     = 12;
+const DIST_PER_LEVEL      = 220;
+const MAX_SPEED_LEVEL     = 6;
+const UPGRADE_COSTS       = [10, 20, 35, 55, 80, 120, 180, 270];
+const UPGRADE_SPEED_BONUS = 15;
+const MONEY_PER_MINUTE    = 20;
+const PASSIVE_MIN_SPEED   = 5;
+
+// — Save / Load progress —
+// Persists money + engine level across page reloads. Wrapped in try/catch
+// so private-mode browsers (no localStorage) silently no-op instead of crashing.
+// Bump SAVE_KEY's version suffix if the schema ever changes.
+const SAVE_KEY = 'batteryBot.save.v1';
+function saveProgress() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      money: state.money,
+      speedUpgrade: state.speedUpgrade
+    }));
+  } catch (_) { /* private mode or quota — ignore */ }
+}
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (typeof data.money === 'number' && isFinite(data.money)) {
+      state.money = Math.max(0, Math.floor(data.money));
+    }
+    if (typeof data.speedUpgrade === 'number' && isFinite(data.speedUpgrade)) {
+      state.speedUpgrade = Math.max(0, Math.min(UPGRADE_COSTS.length, Math.floor(data.speedUpgrade)));
+    }
+  } catch (_) { /* corrupted save — ignore */ }
+}
+function resetProgress() {
+  try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+  state.money = 0;
+  state.moneyFrac = 0;
+  state.speedUpgrade = 0;
+}
+function confirmReset() {
+  if (confirm('Reset all progress? Your money and engine level will be wiped.')) {
+    resetProgress();
+    updateGarageUI();
+  }
+}
+window.resetProgress = resetProgress;
+window.confirmReset  = confirmReset;
+loadProgress();
+
+addEventListener('keydown', e => {
+  state.keys[e.key.toLowerCase()] = true;
+  if (['arrowup','arrowdown','arrowleft','arrowright',' '].includes(e.key.toLowerCase())) {
+    e.preventDefault();
+  }
+});
+addEventListener('keyup', e => state.keys[e.key.toLowerCase()] = false);
+
+// Mobile touch controls. Wires the on-screen buttons to the same state.keys
+// dictionary the keyboard writes to, so the throttle/steer code below
+// doesn't need to know touch even exists. Multi-touch works because each
+// button captures its own pointerId.
+(function setupTouchControls() {
+  // pointer:coarse is true on phones/tablets (finger input) and false on
+  // desktop with a mouse/trackpad. Avoids false positives on macOS where
+  // 'ontouchstart' / maxTouchPoints can lie.
+  const isTouch = matchMedia('(pointer: coarse)').matches;
+  if (!isTouch) return;
+  document.body.classList.add('touch');
+  document.querySelectorAll('#touchControls .touch-btn').forEach(btn => {
+    const key = btn.dataset.key;
+    const press = e => {
+      state.keys[key] = true;
+      btn.classList.add('active');
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+      e.preventDefault();
+    };
+    const release = e => {
+      state.keys[key] = false;
+      btn.classList.remove('active');
+      e.preventDefault();
+    };
+    btn.addEventListener('pointerdown',   press);
+    btn.addEventListener('pointerup',     release);
+    btn.addEventListener('pointercancel', release);
+    btn.addEventListener('pointerleave',  release);
+    btn.addEventListener('contextmenu',   e => e.preventDefault());
+  });
+  // Belt-and-braces: if the page loses focus mid-press (e.g. system gesture),
+  // clear all keys so the car doesn't run away on its own.
+  addEventListener('blur', () => { state.keys = {}; });
+})();
+
+function update(dt) {
+  // Ejection animation runs even though gameOver is true.
+  if (state.ejecting) { runEjection(dt); return; }
+  if (state.gameOver) return;
+  if (state.paused) return;
+
+  // Mood drains while driving. Carrying a passenger keeps the alien
+  // company so the drain rate is halved.
+  const moodDrainRate = state.passenger ? 1.35 : 2.7;
+  state.mood -= dt * moodDrainRate;
+  if (state.mood <= 0) {
+    // Alien gets ejected from the car. Set up the animation; the
+    // game-over overlay shows after it finishes (~1.5s).
+    state.mood = 0;
+    state.gameOver = true;
+    state.ejecting = true;
+    state.ejectTimer = state.ejectMaxTime;
+    // Wipe any in-flight tears so they don't freeze in mid-air during ejection.
+    for (const p of tearData) { p.life = 0; p.y = -1000; }
+    const lost = Math.floor(state.money / 2);
+    state.money -= lost;
+    state.lostMoney = lost;
+    saveProgress();
+    flashCrash();
+    return;
+  }
+  const moodRatio = state.mood / 100;
+
+  for (const c of chargers) {
+    const dx = state.car.x - c.padX;
+    const dz = state.car.z - c.mesh.position.z;
+    const inside = Math.abs(dx) < c.range && Math.abs(dz) < 3;
+    if (inside && !c.wasInside) {
+      state.mood = 100;
+      flashCharged();
+      c.glow.material.opacity = 1.0;
+    }
+    c.wasInside = inside;
+    if (!inside) c.glow.material.opacity *= 0.93;
+  }
+
+  let throttle = 0, steerInput = 0;
+  if (state.keys['w'] || state.keys['arrowup'])    throttle += 1;
+  if (state.keys['s'] || state.keys['arrowdown'])  throttle -= 1;
+  if (state.keys['a'] || state.keys['arrowleft'])  steerInput -= 1;
+  if (state.keys['d'] || state.keys['arrowright']) steerInput += 1;
+
+  const responsiveness = 0.35 + 0.65 * moodRatio;
+  const wobble         = (1 - moodRatio) * (1 - moodRatio);
+  // Top speed: Normal Mode uses the engine-upgrade + speed-level escalation;
+  // Speed Mode ignores those and ramps from SPEED_MODE_START_TOP up to the
+  // hard cap SPEED_MODE_MAX_TOP over SPEED_MODE_RAMP_SECONDS.
+  let topSpeed;
+  if (state.gameMode === 'speed') {
+    const elapsedSec = (performance.now() - state.speedModeStartTime) / 1000;
+    const t = Math.min(1, Math.max(0, elapsedSec / SPEED_MODE_RAMP_SECONDS));
+    topSpeed = SPEED_MODE_START_TOP + (SPEED_MODE_MAX_TOP - SPEED_MODE_START_TOP) * t;
+  } else {
+    topSpeed = BASE_MAX_SPEED
+             + state.speedUpgrade * UPGRADE_SPEED_BONUS
+             + (state.speedLevel - 1) * SPEED_PER_LEVEL;
+  }
+  const maxSpeed = topSpeed * (0.55 + 0.45 * moodRatio);
+
+  if (moodRatio < 0.18 && Math.random() < 0.06) { throttle = 0; steerInput *= 0.2; }
+  if (wobble > 0) steerInput += (Math.random() - 0.5) * wobble * 1.4;
+  if (moodRatio < 0.7) {
+    state.driftTimer -= dt;
+    if (state.driftTimer <= 0) {
+      state.driftDir = (Math.random() - 0.5) * 2;
+      state.driftTimer = 0.4 + Math.random() * 0.7;
+    }
+    steerInput += state.driftDir * (0.7 - moodRatio) * 0.7;
+  }
+
+  const accel = (42 + state.speedUpgrade * 5 + (state.speedLevel - 1) * 5) * responsiveness;
+  state.car.speed += throttle * accel * dt;
+  state.car.speed *= Math.pow(0.92, dt * 60);
+  state.car.speed = Math.max(-maxSpeed * 0.4, Math.min(maxSpeed, state.car.speed));
+
+  // Speed-level escalation is a Normal Mode mechanic; Speed Mode has its own ramp.
+  if (state.gameMode !== 'speed') {
+    const targetLevel = Math.min(MAX_SPEED_LEVEL, 1 + Math.floor(state.distance / DIST_PER_LEVEL));
+    if (targetLevel > state.speedLevel) {
+      state.speedLevel = targetLevel;
+      flashLevelUp();
+    }
+  }
+
+  const speedFactor = Math.min(1, Math.abs(state.car.speed) / 6);
+  const dir = state.car.speed >= 0 ? 1 : -1;
+  state.car.heading -= steerInput * 1.6 * dt * speedFactor * dir;
+  state.steerAngle += (steerInput * 0.5 - state.steerAngle) * Math.min(1, dt * 8);
+  frontAxle.rotation.y = state.steerAngle;
+  wheelFL.position.set(-1.05, 0.45, 1.3);
+  wheelFR.position.set( 1.05, 0.45, 1.3);
+
+  state.car.x += Math.sin(state.car.heading) * state.car.speed * dt;
+  state.car.z += Math.cos(state.car.heading) * state.car.speed * dt;
+  state.distance += Math.abs(state.car.speed) * dt;
+
+  if (MONEY_PER_MINUTE > 0 && state.car.speed > PASSIVE_MIN_SPEED) {
+    state.moneyFrac += (MONEY_PER_MINUTE / 60) * dt;
+    let earned = 0;
+    while (state.moneyFrac >= 1) {
+      state.money += 1;
+      state.moneyFrac -= 1;
+      earned++;
+    }
+    if (earned > 0) saveProgress();
+  }
+
+  state.scraping = false;
+  if (state.car.x > DRIVE_HALF) {
+    state.car.x = DRIVE_HALF; state.scraping = true; state.car.speed *= 0.85;
+    if (Math.sin(state.car.heading) > 0) state.car.heading -= dt * 3;
+  } else if (state.car.x < -DRIVE_HALF) {
+    state.car.x = -DRIVE_HALF; state.scraping = true; state.car.speed *= 0.85;
+    if (Math.sin(state.car.heading) < 0) state.car.heading += dt * 3;
+  }
+
+  car.position.set(state.car.x, 0, state.car.z);
+  car.rotation.y = state.car.heading;
+  const wheelSpin = state.car.speed * dt * 2.2;
+  [wheelFL, wheelFR, wheelRL, wheelRR].forEach(w => w.rotation.x += wheelSpin);
+
+  const eyeColor = moodRatio > 0.5 ? 0x22d3ee : moodRatio > 0.2 ? 0xfbbf24 : 0xef4444;
+  eye.material.color.setHex(eyeColor);
+  eye.material.emissive.setHex(eyeColor);
+  const statusColor = moodRatio > 0.2 ? 0x22ff44 : 0xff3344;
+  statusLight.material.color.setHex(statusColor);
+  statusLight.material.emissive.setHex(statusColor);
+  statusLight.material.emissiveIntensity = moodRatio < 0.3
+    ? 1.0 + Math.sin(performance.now() / 80) * 0.6
+    : 1.2;
+
+  const baseRate = 6;
+  const lowDrain = (1 - moodRatio) * (1 - moodRatio) * 70;
+  spawnLeak(baseRate + lowDrain, dt);
+  updateParticles(dt, moodRatio);
+
+  // — Sad-mood polish —
+  // 1) Tears drip from the alien's eye when mood is low.
+  // 2) Robot slumps forward as mood drops (this section is skipped while
+  //    ejecting / gameOver / paused because update() returns early in those
+  //    states — keeps the ejection animation safe).
+  // 3) World fog + sky desaturate toward gray when mood is low.
+  // All driven by moodRatio; at full mood every contribution lerps to zero.
+  if (moodRatio < TEAR_THRESHOLD) {
+    const sadness = (TEAR_THRESHOLD - moodRatio) / TEAR_THRESHOLD;
+    spawnTears(TEAR_RATE_AT_ZERO * sadness * sadness, dt);
+  }
+  updateTears(dt);
+
+  const slumpTarget = (1 - moodRatio) * (1 - moodRatio) * 0.35; // ~20° forward at zero mood
+  robot.rotation.x += (slumpTarget - robot.rotation.x) * Math.min(1, dt * 3);
+
+  // Fog/sky lerp from happy sky #b8c8d4 toward sad gray #888c90.
+  // sadAmt is 0 above moodRatio 0.6 and ramps to 0.8 at zero mood (capped so
+  // the world never goes fully gray — keeps the road readable).
+  const sadAmt = Math.max(0, (0.6 - moodRatio) / 0.6) * 0.8;
+  scene.fog.color.setRGB(
+    0.722 - sadAmt * 0.189,
+    0.784 - sadAmt * 0.235,
+    0.831 - sadAmt * 0.267
+  );
+  scene.background.copy(scene.fog.color);
+
+  // Ride-share loop runs only in Normal Mode. Speed Mode has its own
+  // pedestrian-flinging loop instead and never triggers passenger pickup.
+  if (state.gameMode !== 'speed') {
+    for (const c of civilians) {
+      const wantBeacon = state.passenger ? 0 : 0.35;
+      c.beacon.material.opacity += (wantBeacon - c.beacon.material.opacity) * Math.min(1, dt * 6);
+      if (!state.passenger && c.mesh.visible) {
+        const dx = state.car.x - c.mesh.position.x;
+        const dz = state.car.z - c.mesh.position.z;
+        if (Math.abs(dx) < PICKUP_LAT && Math.abs(dz) < PICKUP_LONG) {
+          state.passenger = c;
+          c.mesh.visible = false;
+          passengerInCar.visible = true;
+          pCarBody.material.color.setHex(c.body.material.color.getHex());
+          // Picking up someone makes the alien less lonely
+          state.mood = Math.min(100, state.mood + 20);
+        }
+      }
+    }
+    for (const h of houses) {
+      const targetGlow = state.passenger ? 0.8 : 0;
+      h.roof.material.emissiveIntensity +=
+        (targetGlow - h.roof.material.emissiveIntensity) * Math.min(1, dt * 5);
+      if (state.passenger) {
+        const dx = state.car.x - h.mesh.position.x;
+        const dz = state.car.z - h.mesh.position.z;
+        if (Math.abs(dx) < DROPOFF_LAT && Math.abs(dz) < DROPOFF_LONG) {
+          const payout = 1 + Math.floor(Math.random() * 100);
+          state.money += payout;
+          showPayout(payout);
+          state.passenger = null;
+          passengerInCar.visible = false;
+          // Successful delivery boosts the alien's mood
+          state.mood = Math.min(100, state.mood + 25);
+          saveProgress();
+        }
+      }
+    }
+  } else {
+    // Speed Mode: arcade pedestrian flings.
+    updatePedestrians(dt);
+  }
+
+  ground.position.z = state.car.z;
+  road.position.z   = state.car.z;
+  edgeL.position.z  = state.car.z;
+  edgeR.position.z  = state.car.z;
+  railTopL.position.z = railBotL.position.z = state.car.z;
+  railTopR.position.z = railBotR.position.z = state.car.z;
+  for (const m of laneMarkers) streamObject(m.mesh);
+  for (const p of railPosts)   streamObject(p.mesh);
+  // Trees: stream + apply per-frame wind sway to the foliage subgroup
+  const windT = performance.now() * 0.001;
+  for (const t of trees) {
+    streamObject(t.mesh, () => randomizeTree(t));
+    if (t.foliageGroup) {
+      t.foliageGroup.rotation.x = Math.sin(windT + t.windPhase) * 0.035;
+      t.foliageGroup.rotation.z = Math.cos(windT * 0.7 + t.windPhase) * 0.028;
+    }
+  }
+  for (const j of junk) {
+    const z = j.active.position.z;
+    const dz = z - state.car.z;
+    if (dz < -STREAM_BEHIND || dz > STREAM_AHEAD) {
+      const newZ = dz < -STREAM_BEHIND ? z + STREAM_TOTAL : z - STREAM_TOTAL;
+      randomizeJunk(j);
+      j.active.position.z = newZ;
+    }
+  }
+  for (const c of chargers)   streamObject(c.mesh, () => randomizeCharger(c));
+  // In Speed Mode the ride-share pool stays hidden — skip the randomize so streamed
+  // civilians/houses don't get re-revealed by `randomize*` setting visible=true.
+  // The mesh still streams (zHolder.position.z gets recycled) so positions stay sane.
+  if (state.gameMode !== 'speed') {
+    for (const c of civilians)  streamObject(c.mesh, () => { if (state.passenger !== c) randomizeCivilian(c); });
+    for (const h of houses)     streamObject(h.mesh, () => randomizeHouse(h));
+  } else {
+    for (const c of civilians) streamObject(c.mesh);
+    for (const h of houses)    streamObject(h.mesh);
+  }
+  for (const b of billboards) streamObject(b.mesh, () => randomizeBillboard(b));
+
+  const speedMag = Math.abs(state.car.speed);
+  // Higher cap in Speed Mode so the camera/FOV keep responding past Normal Mode's
+  // top — gives the rush a visible payoff at 200+ m/s instead of saturating early.
+  const speedRatioCap = state.gameMode === 'speed' ? 2.0 : 1.4;
+  const speedRatio = Math.min(speedRatioCap, speedMag / 60);
+  const camDist   = 9   + speedRatio * 4;
+  const camHeight = 4.5 + speedRatio * 1.0;
+  const targetFov = 62  + speedRatio * 8;
+  state.fov += (targetFov - state.fov) * Math.min(1, dt * 3);
+  if (Math.abs(camera.fov - state.fov) > 0.05) {
+    camera.fov = state.fov;
+    camera.updateProjectionMatrix();
+  }
+  const camX = state.car.x - Math.sin(state.car.heading) * camDist;
+  const camZ = state.car.z - Math.cos(state.car.heading) * camDist;
+  camera.position.lerp(new THREE.Vector3(camX, camHeight, camZ), Math.min(1, dt * 4));
+  camera.lookAt(state.car.x, 1.5, state.car.z);
+
+  // Refresh the navigation arrow + 3D marker
+  updateObjective(dt);
+
+  document.getElementById('dist').textContent    = Math.floor(state.distance);
+  document.getElementById('speedLv').textContent = state.speedLevel;
+  document.getElementById('money').textContent   = '$' + state.money;
+  document.getElementById('upgLv').textContent   = state.speedUpgrade;
+  const passEl = document.getElementById('passenger');
+  if (state.passenger) {
+    passEl.textContent = 'Passenger: 1/1 — find a house!';
+    passEl.style.color = '#fde047';
+  } else {
+    passEl.textContent = 'Passenger: 0/1';
+    passEl.style.color = '#94a3b8';
+  }
+  document.getElementById('batPct').textContent = Math.round(state.mood) + '%';
+  const bar = document.getElementById('bat');
+  bar.style.width = state.mood + '%';
+  // Smooth color lerp through 4 stops:
+  // 100 green (74,222,128) → 75 yellow (250,204,21) → 50 orange (249,115,22) → 25 red (239,68,68) → 0 red.
+  {
+    const m = state.mood;
+    let r, g, b;
+    if (m >= 75) {
+      const t = (m - 75) / 25;
+      r = Math.round(250 + (74  - 250) * t);
+      g = Math.round(204 + (222 - 204) * t);
+      b = Math.round(21  + (128 - 21 ) * t);
+    } else if (m >= 50) {
+      const t = (m - 50) / 25;
+      r = Math.round(249 + (250 - 249) * t);
+      g = Math.round(115 + (204 - 115) * t);
+      b = Math.round(22  + (21  - 22 ) * t);
+    } else if (m >= 25) {
+      const t = (m - 25) / 25;
+      r = Math.round(239 + (249 - 239) * t);
+      g = Math.round(68  + (115 - 68 ) * t);
+      b = Math.round(68  + (22  - 68 ) * t);
+    } else {
+      r = 239; g = 68; b = 68;
+    }
+    bar.style.background = `rgb(${r}, ${g}, ${b})`;
+  }
+
+  // Navigation system — pick a target, animate markers, update HUD arrow.
+  updateNavigation(dt);
+  animateWorldMarkers(dt);
+}
+
+// ============================================================
+// Objective system — pick the most relevant target each frame and
+// update the HUD arrow + 3D marker accordingly.
+//   Priority: low-mood charger > drop-off house > pickup passenger
+// ============================================================
+const LOW_MOOD_THRESHOLD = 25;   // below this, route the player to a charger
+
+function pickObjective() {
+  // Helper to find the nearest object that's "ahead" of the player
+  function nearest(items, pickPos, visibleCheck) {
+    let best = null, bestDist = Infinity;
+    for (const it of items) {
+      if (visibleCheck && !visibleCheck(it)) continue;
+      const pos = pickPos(it);
+      const dx = pos.x - state.car.x;
+      const dz = pos.z - state.car.z;
+      if (dz < -25) continue;        // skip targets well behind the car
+      const d = Math.hypot(dx, dz);
+      if (d < bestDist) { bestDist = d; best = pos; }
+    }
+    return best;
+  }
+
+  // 1) Low-mood emergency: send the player to the nearest charge pad
+  if (state.mood < LOW_MOOD_THRESHOLD) {
+    const t = nearest(chargers,
+      c => ({ x: c.padX, z: c.mesh.position.z }));
+    if (t) return { pos: t, type: 'charger', label: 'Mood boost', text: 'Find mood boost' };
+  }
+  // 2) Carrying a passenger? Point at a house
+  if (state.passenger) {
+    const t = nearest(houses,
+      h => ({ x: h.mesh.position.x, z: h.mesh.position.z }),
+      h => h.mesh.visible);
+    if (t) return { pos: t, type: 'house', label: 'House', text: 'Drop off passenger' };
+  }
+  // 3) Empty? Point at a passenger
+  if (!state.passenger) {
+    const t = nearest(civilians,
+      c => ({ x: c.mesh.position.x, z: c.mesh.position.z }),
+      c => c.mesh.visible);
+    if (t) return { pos: t, type: 'civilian', label: 'Passenger', text: 'Find a passenger' };
+  }
+  return null;
+}
+
+function updateObjective(dt) {
+  const obj = pickObjective();
+  const objText  = document.getElementById('objText');
+  const objArrow = document.getElementById('objArrow');
+  const objDist  = document.getElementById('objDist');
+
+  if (!obj) {
+    objText.textContent  = 'Cruising...';
+    objDist.textContent  = '—';
+    objArrow.style.color = '#94a3b8';
+    objArrow.style.transform = 'rotate(0deg)';
+    objMarker.visible = false;
+    return;
+  }
+
+  // HUD text + distance
+  const dx = obj.pos.x - state.car.x;
+  const dz = obj.pos.z - state.car.z;
+  const dist = Math.hypot(dx, dz);
+  objText.textContent = obj.text;
+  objDist.textContent = obj.label + ': ' + Math.round(dist) + 'm';
+
+  // HUD arrow rotation: angle relative to car's heading.
+  // 0° = target straight ahead, +90° = target to the right.
+  const worldAngle = Math.atan2(dx, dz);
+  const relAngle = worldAngle - state.car.heading;
+  objArrow.style.transform = 'rotate(' + (relAngle * 180 / Math.PI).toFixed(1) + 'deg)';
+
+  // Color by target type (also applied to the 3D marker)
+  const css = obj.type === 'civilian' ? '#4ade80'
+            : obj.type === 'house'    ? '#fde047'
+            :                            '#60a5fa';
+  const hex = obj.type === 'civilian' ? 0x4ade80
+            : obj.type === 'house'    ? 0xfde047
+            :                            0x60a5fa;
+  objArrow.style.color = css;
+
+  // 3D marker bobs above the target
+  objMarker.visible = true;
+  const bob = Math.sin(performance.now() / 280) * 0.4;
+  objMarker.position.set(obj.pos.x, 5.2 + bob, obj.pos.z);
+  objMarkerCone.material.color.setHex(hex);
+  objMarkerCone.material.emissive.setHex(hex);
+}
+
+// ============================================================
+// Navigation — picks the most relevant target right now and
+// updates the HUD arrow + objective text + distance, plus
+// animates the floating world markers above each pool item.
+// ============================================================
+// Reuses LOW_MOOD_THRESHOLD defined further up — same number, same purpose
+// (route to charger when mood crashes); collapsed to a single source of truth.
+
+function updateNavigation(dt) {
+  // 1) Decide what the player should do.
+  let pool, type, label, color;
+  if (state.mood < LOW_MOOD_THRESHOLD) {
+    pool = chargers;     type = 'charge';    label = 'Mood pad';   color = '#60a5fa';
+  } else if (state.passenger) {
+    pool = houses;       type = 'house';     label = 'House';      color = '#fde047';
+  } else {
+    pool = civilians;    type = 'civilian';  label = 'Passenger';  color = '#4ade80';
+  }
+
+  // 2) Find the nearest target ahead-ish of the player.
+  //    "Ahead-ish" = z within [carZ - 20, carZ + STREAM_AHEAD],
+  //    so just-passed targets are still pickable for a moment.
+  let best = null, bestDist = Infinity;
+  for (const item of pool) {
+    if (type === 'civilian' && !item.mesh.visible) continue;   // already picked up
+    const dx = item.mesh.position.x + (item.padX || 0) - state.car.x;
+    // For civilians/houses item.mesh.position.x IS the world x. For chargers
+    // the mesh is at x=0 and the active lane is in item.padX, so use that:
+    const itemX = (type === 'charge') ? item.padX : item.mesh.position.x;
+    const dxReal = itemX - state.car.x;
+    const dz = item.mesh.position.z - state.car.z;
+    if (dz < -20) continue;
+    const d = Math.hypot(dxReal, dz);
+    if (d < bestDist) { bestDist = d; best = { mesh: item.mesh, x: itemX, z: item.mesh.position.z }; }
+  }
+
+  // 3) Update the HUD.
+  const objEl  = document.getElementById('navObjective');
+  const distEl = document.getElementById('navDistance');
+  const svg    = document.getElementById('navArrowSvg');
+  const objectiveText = {
+    civilian: 'Find a passenger',
+    house:    'Drop off passenger',
+    charge:   'Find mood boost!'
+  }[type];
+  objEl.textContent = objectiveText;
+  svg.style.color = color;
+
+  if (!best) {
+    distEl.textContent = 'Looking for one nearby…';
+    return;
+  }
+
+  // Direction from car to target, relative to the car's facing.
+  // Car heading 0 = facing +Z, so a target straight ahead is at angle 0
+  // and the HUD arrow points up (no rotation).
+  const dx = best.x - state.car.x;
+  const dz = best.z - state.car.z;
+  const dirAngle = Math.atan2(dx, dz);
+  let rel = dirAngle - state.car.heading;
+  while (rel >  Math.PI) rel -= 2 * Math.PI;
+  while (rel < -Math.PI) rel += 2 * Math.PI;
+  const angleDeg = rel * 180 / Math.PI;
+
+  distEl.textContent = label + ': ' + Math.floor(bestDist) + ' m';
+  svg.style.transform = 'rotate(' + angleDeg + 'deg)';
+}
+
+// Subtle bob + spin animation for all world markers
+function animateWorldMarkers(dt) {
+  const bob = Math.sin(performance.now() * 0.003) * 0.18;
+  const spin = dt * 1.6;
+  for (const c of civilians) {
+    if (!c.marker) continue;
+    c.marker.position.y = c.baseMarkerY + bob;
+    c.marker.rotation.y += spin;
+    // Hide marker if civilian is being carried
+    c.marker.visible = c.mesh.visible;
+  }
+  for (const h of houses) {
+    h.marker.position.y = h.baseMarkerY + bob;
+    h.marker.rotation.y += spin;
+    // Hide the floating cone above hidden houses (e.g. while in Speed Mode)
+    h.marker.visible = h.mesh.visible;
+  }
+  for (const c of chargers) {
+    c.marker.position.y = c.baseMarkerY + bob;
+    c.marker.rotation.y += spin;
+  }
+}
+
+// ============================================================
+// Ejection animation — when mood hits 0, the alien yeets out of
+// the car in a tumbling arc. Car decelerates hard. After 1.5s
+// the game-over overlay shows.
+// ============================================================
+function runEjection(dt) {
+  state.ejectTimer -= dt;
+
+  // Hard brake the car
+  state.car.speed *= Math.pow(0.78, dt * 60);
+  state.car.x += Math.sin(state.car.heading) * state.car.speed * dt;
+  state.car.z += Math.cos(state.car.heading) * state.car.speed * dt;
+  car.position.set(state.car.x, 0, state.car.z);
+  car.rotation.y = state.car.heading;
+
+  // Animate alien launching forward + up with gravity arc.
+  const t = state.ejectMaxTime - state.ejectTimer; // elapsed time 0..1.5
+  const vy = 9.5;            // initial upward velocity
+  const vz = 5.5;            // forward launch velocity (in car-local +Z)
+  const gravity = 14;
+  const dy = vy * t - 0.5 * gravity * t * t;
+  const dz = vz * t;
+  const dx = Math.sin(t * 5) * 0.4;             // little side-to-side wobble
+  robot.position.set(-0.35 + dx, 1.0 + dy, -0.1 + dz);
+  // Spin while tumbling
+  robot.rotation.x += dt * 9;
+  robot.rotation.z += dt * 6;
+
+  // Camera pulls back a bit to show the action
+  const camDist = 11;
+  const camX = state.car.x - Math.sin(state.car.heading) * camDist;
+  const camZ = state.car.z - Math.cos(state.car.heading) * camDist;
+  camera.position.lerp(new THREE.Vector3(camX, 5.5, camZ), Math.min(1, dt * 3));
+  camera.lookAt(state.car.x, 2, state.car.z);
+
+  // After the arc, show the game-over screen.
+  if (state.ejectTimer <= 0) {
+    state.ejecting = false;
+    showOverlay('Mood crashed! The alien yeeted out. You lost $' + state.lostMoney + ' (50%).');
+  }
+}
+
+function flashLevelUp() {
+  const el = document.getElementById('levelup');
+  el.textContent = state.speedLevel >= MAX_SPEED_LEVEL ? 'TOP SPEED!' : 'SPEED UP!';
+  el.style.opacity = '1';
+  el.style.transform = 'translate(-50%,-50%) scale(1.2)';
+  clearTimeout(flashLevelUp._t);
+  flashLevelUp._t = setTimeout(() => {
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%,-50%) scale(1)';
+  }, 700);
+}
+
+function showOverlay(msg) {
+  document.getElementById('endMsg').textContent     = msg;
+  document.getElementById('finalDist').textContent  = Math.floor(state.distance);
+  document.getElementById('finalMoney').textContent = '$' + state.money;
+  document.getElementById('overlay').style.display  = 'flex';
+}
+function restart() {
+  state.car = { x: 0, z: 0, heading: 0, speed: 0 };
+  state.mood = 100;
+  state.distance = 0;
+  state.gameOver = false;
+  state.paused = false;
+  state.steerAngle = 0;
+  state.speedLevel = 1;
+  state.passenger = null;
+  state.ejecting = false;
+  state.ejectTimer = 0;
+  state.lostMoney = 0;
+  // Speed Mode bonus: clicking "Try Again" from a Speed Mode game-over should
+  // re-enter Speed Mode at the same starting conditions instead of dropping
+  // the player at 0 m/s with the ramp clock still ticking from before the death.
+  if (state.gameMode === 'speed') {
+    state.car.speed = SPEED_MODE_INITIAL_SPEED;
+    state.speedModeStartTime = performance.now();
+  }
+  // Reset alien position back into the driver's seat after an ejection
+  robot.position.set(-0.35, 1.0, -0.1);
+  robot.rotation.set(0, 0, 0);
+  passengerInCar.visible = false;
+  // Civilian + house visibility follows gameMode — Speed Mode keeps them hidden.
+  const showRideShare = state.gameMode !== 'speed';
+  for (const c of civilians) c.mesh.visible = showRideShare;
+  for (const h of houses)    h.mesh.visible = showRideShare;
+  // Pedestrians: visible only in Speed Mode. Recycle resets their flying state too.
+  for (const p of pedestrians) recyclePedestrian(p);
+  for (const p of particleData) { p.life = 0; p.y = -1000; }
+  for (const p of tearData)     { p.life = 0; p.y = -1000; }
+  document.getElementById('overlay').style.display = 'none';
+}
+window.restart = restart;
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  update(dt);
+  renderer.render(scene, camera);
+  requestAnimationFrame(loop);
+}
+loop(performance.now());
+</script>
+</body>
+</html>
