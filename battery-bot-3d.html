@@ -14,6 +14,8 @@
     overflow: hidden;
     user-select: none;
     height: 100%;
+    /* Dynamic viewport handles iOS Safari address-bar collapse better than 100vh. */
+    height: 100dvh;
   }
   canvas { display: block; }
   .panel {
@@ -127,7 +129,9 @@
     border: 2px solid rgba(255,255,255,0.18);
     border-radius: 50%;
     color: #e8eef9;
-    font-size: 30px;
+    /* font-size sized for text labels (LEFT/RIGHT/GAS/BRAKE) — was 30px when
+       the buttons used ◀ ▶ chevron icons. Mobile media queries below tighten further. */
+    font-size: 14px;
     font-weight: 700;
     display: flex;
     align-items: center;
@@ -162,21 +166,189 @@
     background: rgba(239,68,68,0.45);
   }
   #touchBrake.active { background: rgba(239,68,68,0.85); }
+
+  /* ==========================================================
+     MOBILE-FIRST UI — portrait + landscape layouts.
+     Triggered by pointer:coarse (matches the body.touch JS gate
+     so they activate together). Desktop styles above are the
+     fallback / default. Use !important to override inline styles
+     on HUD buttons + overlay cards.
+     ========================================================== */
+
+  /* ---- Mobile portrait (phones only — max-width keeps iPads on desktop layout) ---- */
+  /* Big simplification: hide non-essential stats so HUD is just Money / Passenger /
+     Mood bar / Pause (top-right) / Menu (☰) / Nav (compact bottom-left).
+     Distance, Speed Lv., Engine Lv., Garage button → hidden. Get them via the drawer. */
+  @media (pointer: coarse) and (orientation: portrait) and (max-width: 600px) {
+    /* Compact stats panel top-left — only Money + Passenger rows visible */
+    #stats {
+      top: 8px !important; left: 8px !important;
+      font-size: 11px; padding: 5px 9px;
+      line-height: 1.4;
+    }
+    /* Hide Distance/Speed-Lv row and the inline "Engine Lv." span — drawer shows them */
+    #statDistRow    { display: none !important; }
+    #statEngineLine { display: none !important; }
+    /* Mood bar moves under stats on the LEFT (was top-right) so it doesn't compete with Pause */
+    #battery-panel {
+      top: 56px !important; left: 8px !important; right: auto !important;
+      padding: 4px 8px; gap: 6px; font-size: 11px;
+    }
+    .meter { width: 130px !important; height: 10px; }
+    /* PAUSE stays top-right on portrait — the only HUD button up there */
+    #pauseBtn {
+      top: 8px !important; right: 8px !important; left: auto !important;
+      padding: 6px 12px !important; font-size: 12px; letter-spacing: 0.5px;
+    }
+    /* GARAGE button hidden on mobile (reachable via Pause → Garage or ☰ drawer) */
+    #garageBtn { display: none !important; }
+    /* ☰ MENU button — visible on mobile only, top-right just below Pause */
+    #menuBtn {
+      display: inline-block !important;
+      top: 44px !important; right: 8px !important; left: auto !important;
+      padding: 5px 10px !important; font-size: 11px; letter-spacing: 0.5px;
+    }
+    /* Nav panel — small, positioned LOW so it doesn't compete with the top HUD.
+       Sits just above the steering buttons on the left. */
+    #navPanel {
+      top: auto !important;
+      bottom: calc(116px + env(safe-area-inset-bottom)) !important;
+      left: 8px !important; right: auto !important;
+      min-width: 0 !important; max-width: 200px;
+      padding: 5px 8px !important;
+      font-size: 10px; opacity: 0.88;
+    }
+    #navObjective { font-size: 11px !important; }
+    #navDistance  { font-size: 10px !important; }
+    #navArrowSvg  { width: 24px; height: 24px; }
+    /* Touch controls — slightly smaller, more bottom safe-area spacing */
+    .touch-btn { font-size: 12px; letter-spacing: 0.5px; }
+    #touchLeft  { width: 70px !important; height: 70px !important;
+                  bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+                  left:   calc(12px + env(safe-area-inset-left))   !important; }
+    #touchRight { width: 70px !important; height: 70px !important;
+                  bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+                  left:   calc(92px + env(safe-area-inset-left))   !important; }
+    #touchGas   { width: 84px !important; height: 84px !important;
+                  bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+                  right:  calc(12px + env(safe-area-inset-right))  !important;
+                  font-size: 13px !important; }
+    #touchBrake { width: 68px !important; height: 68px !important;
+                  bottom: calc(28px + env(safe-area-inset-bottom)) !important;
+                  right:  calc(108px + env(safe-area-inset-right)) !important;
+                  font-size: 11px !important; }
+    /* Overlay cards: fit phone width, scroll if tall, use dvh so address-bar collapse works */
+    #pauseOverlay > div,
+    #settingsOverlay > div,
+    #garageOverlay > div,
+    #mainMenuOverlay > div {
+      min-width: 0 !important;
+      max-width: 90vw !important;
+      max-height: 80dvh !important;
+      overflow-y: auto;
+      padding: 18px 16px !important;
+    }
+    /* Smaller overlay titles */
+    #overlay h2,
+    #pauseOverlay h2,
+    #settingsOverlay h2,
+    #mainMenuOverlay h2,
+    #garageOverlay h2 { font-size: 20px !important; }
+    /* Compact garage cards on phone */
+    .upgrade-card { padding: 10px 12px; margin-bottom: 8px; }
+    /* Tighter garage buttons */
+    #garageOverlay button { padding: 10px !important; font-size: 14px !important; }
+  }
+
+  /* ---- Mobile landscape (phones only — max-height keeps iPads on desktop layout) ---- */
+  /* Mirrors portrait simplification. Pause STAYS top-right (never jumps to left). */
+  @media (pointer: coarse) and (orientation: landscape) and (max-height: 500px) {
+    /* Stats top-left, Money + Passenger only */
+    #stats {
+      top: 6px !important; left: 6px !important;
+      font-size: 10px; padding: 4px 8px;
+    }
+    #statDistRow    { display: none !important; }
+    #statEngineLine { display: none !important; }
+    /* Mood bar below stats on the left, still compact */
+    #battery-panel {
+      top: 44px !important; left: 6px !important; right: auto !important;
+      padding: 3px 7px; gap: 6px;
+    }
+    .meter { width: 110px !important; height: 9px; }
+    /* PAUSE stays top-right (user spec — no jumping sides) */
+    #pauseBtn  {
+      top: 6px !important; right: 6px !important; left: auto !important;
+      padding: 4px 9px !important; font-size: 10px;
+    }
+    #garageBtn { display: none !important; }
+    /* ☰ MENU — top-right below pause */
+    #menuBtn {
+      display: inline-block !important;
+      top: 36px !important; right: 6px !important; left: auto !important;
+      padding: 4px 8px !important; font-size: 10px;
+    }
+    /* Nav panel — small, positioned just above the steering buttons */
+    #navPanel  {
+      top: auto !important;
+      bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+      left: 6px !important; right: auto !important;
+      min-width: 0 !important; max-width: 180px;
+      padding: 4px 8px !important; font-size: 10px;
+    }
+    #navArrowSvg { width: 22px; height: 22px; }
+    /* Touch controls compact in the corners */
+    .touch-btn { font-size: 11px; }
+    #touchLeft  { width: 60px !important; height: 60px !important;
+                  bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+                  left:   calc(8px  + env(safe-area-inset-left))   !important; }
+    #touchRight { width: 60px !important; height: 60px !important;
+                  bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+                  left:   calc(76px + env(safe-area-inset-left))   !important; }
+    #touchGas   { width: 72px !important; height: 72px !important;
+                  bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+                  right:  calc(8px  + env(safe-area-inset-right))  !important;
+                  font-size: 11px !important; }
+    #touchBrake { width: 60px !important; height: 60px !important;
+                  bottom: calc(14px + env(safe-area-inset-bottom)) !important;
+                  right:  calc(88px + env(safe-area-inset-right))  !important;
+                  font-size: 10px !important; }
+    /* Overlay cards in landscape: narrower, centered */
+    #pauseOverlay > div,
+    #settingsOverlay > div,
+    #garageOverlay > div,
+    #mainMenuOverlay > div {
+      min-width: 0 !important;
+      max-width: 72vw !important;
+      max-height: 86dvh !important;
+      overflow-y: auto;
+      padding: 14px 18px !important;
+    }
+    #overlay h2 { font-size: 18px !important; }
+    .upgrade-card { padding: 8px 12px; margin-bottom: 8px; }
+    #garageOverlay button { padding: 9px !important; font-size: 13px !important; }
+  }
 </style>
 </head>
 <body>
 
 <div id="stats" class="panel">
-  <div>Distance: <strong id="dist">0</strong> m &nbsp;•&nbsp; Speed Lv. <strong id="speedLv">1</strong></div>
-  <div style="margin-top:4px;">Money: <strong id="money" style="color:#fde047">$0</strong> &nbsp;•&nbsp; Engine Lv. <strong id="upgLv">0</strong></div>
+  <!-- Each row + inline span has an id so mobile media queries can hide non-essentials. -->
+  <div id="statDistRow">Distance: <strong id="dist">0</strong> m &nbsp;•&nbsp; Speed Lv. <strong id="speedLv">1</strong></div>
+  <div id="statMoneyRow" style="margin-top:4px;">Money: <strong id="money" style="color:#fde047">$0</strong><span id="statEngineLine"> &nbsp;•&nbsp; Engine Lv. <strong id="upgLv">0</strong></span></div>
   <div id="passenger" style="margin-top:4px; color:#94a3b8;">Passenger: 0/1</div>
 </div>
 
-<button class="hud-btn" id="pauseBtn"  onclick="openPause()"  style="top:84px;  left:16px; color:#fbbf24;">PAUSE</button>
-<button class="hud-btn" id="garageBtn" onclick="openGarage()" style="top:128px; left:16px; color:#fde047;">OPEN GARAGE</button>
-<button class="hud-btn" id="musicBtn"  onclick="toggleMusic()" style="top:172px; left:16px; color:#a5b4fc;">MUSIC: ON</button>
+<!-- HUD buttons stack on the left below the stats panel. Music/SFX toggles
+     used to live here but moved into the Settings overlay (Pause → Settings)
+     to declutter the screen. -->
+<button class="hud-btn" id="pauseBtn"  onclick="openPause()"  style="top:100px; left:16px; color:#fbbf24;">PAUSE</button>
+<button class="hud-btn" id="garageBtn" onclick="openGarage()" style="top:144px; left:16px; color:#fde047;">GARAGE</button>
+<!-- Mobile-only menu (☰) — hidden on desktop. Tapping opens the bottom-sheet
+     drawer with stats snapshot + Garage/Settings/Main Menu/Close. -->
+<button class="hud-btn mobile-only" id="menuBtn" onclick="openDrawer()" style="display:none; color:#cbd5e1;">☰ MENU</button>
 
-<div id="navPanel" class="panel" style="top:220px; left:16px; min-width:220px; padding:12px 14px;">
+<div id="navPanel" class="panel" style="top:196px; left:16px; min-width:220px; padding:12px 14px;">
   <div style="display:flex; align-items:center; gap:12px;">
     <svg id="navArrowSvg" viewBox="0 0 32 32" width="38" height="38" style="flex-shrink:0; transition:transform 0.18s ease-out; filter:drop-shadow(0 0 6px currentColor); color:#4ade80;">
       <path id="navArrowPath" d="M16 3 L27 27 L16 22 L5 27 Z" fill="currentColor"/>
@@ -185,15 +357,6 @@
       <div id="navObjective" style="font-size:13px; font-weight:600; margin-bottom:2px;">Find a passenger</div>
       <div id="navDistance" style="font-size:12px; opacity:0.7;">—</div>
     </div>
-  </div>
-</div>
-
-<!-- Objective panel: tells the player what to do + which way to go + how far -->
-<div id="objective" class="panel" style="top:88px; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:14px; min-width:240px;">
-  <div id="objArrow" style="font-size:30px; line-height:1; transform-origin:center; transition:transform 0.12s; color:#4ade80; font-weight:700;">▲</div>
-  <div>
-    <div id="objText" style="font-weight:600; font-size:14px; line-height:1.2;">Find a passenger</div>
-    <div id="objDist" style="opacity:0.65; font-size:12px; margin-top:2px;">—</div>
   </div>
 </div>
 
@@ -262,8 +425,48 @@
     <h2 style="margin:0 0 6px; font-size:30px; color:#fbbf24;">Paused</h2>
     <p style="opacity:0.6; margin:0 0 24px; font-size:13px;">Game is frozen. Resume to keep playing.</p>
     <button onclick="closePause()" style="width:100%; padding:14px; font-size:16px; margin-top:0;">Resume</button>
+    <button onclick="gotoGarage()" style="width:100%; padding:12px; font-size:14px; margin-top:10px; background:#2a3052; color:#fde047;">Garage</button>
+    <button onclick="openSettings()" style="width:100%; padding:12px; font-size:14px; margin-top:10px; background:#2a3052;">Settings</button>
     <button onclick="openMainMenu()" style="width:100%; padding:12px; font-size:14px; margin-top:10px; background:#2a3052;">Main Menu</button>
     <p style="opacity:0.4; margin:14px 0 0; font-size:11px;">Press P or Esc to resume</p>
+  </div>
+</div>
+
+<!-- Settings overlay — opened from the Pause overlay. Houses Music + SFX toggles
+     (the actual buttons keep their old IDs musicBtn / sfxBtn so the existing
+     toggleMusic / toggleSfx functions work unchanged — they just live here now
+     instead of on the main HUD). -->
+<div id="settingsOverlay" style="position:fixed; inset:0; display:none; background:rgba(10,14,39,0.94); align-items:center; justify-content:center; z-index:21; backdrop-filter:blur(8px); flex-direction:column;">
+  <div style="background:#13182e; border:1px solid #2a3052; border-radius:12px; padding:32px 36px; min-width:340px; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,0.5); text-align:center;">
+    <h2 style="margin:0 0 4px; font-size:28px; color:#a5b4fc;">Settings</h2>
+    <p style="opacity:0.6; margin:0 0 24px; font-size:13px;">Audio preferences</p>
+    <button id="musicBtn" onclick="toggleMusic()" style="width:100%; padding:14px; font-size:15px; margin-top:0; background:#2a3052; color:#a5b4fc;">MUSIC: ON</button>
+    <button id="sfxBtn"   onclick="toggleSfx()"   style="width:100%; padding:14px; font-size:15px; margin-top:10px; background:#2a3052; color:#fcd34d;">SFX: ON</button>
+    <button onclick="closeSettings()" style="background:transparent; color:#e8eef9; border:1px solid #3a4070; padding:10px 24px; font-size:14px; margin-top:16px;">Back</button>
+  </div>
+</div>
+
+<!-- Mobile drawer (bottom sheet) — opened by the ☰ MENU button on mobile.
+     Shows a stats snapshot + quick access to Garage / Settings / Main Menu.
+     Mobile-friendly: anchored to bottom, full-width on phones, max-height 80dvh.
+     Pauses gameplay via state.paused while open. -->
+<div id="drawerOverlay" style="position:fixed; inset:0; display:none; background:rgba(10,14,39,0.7); align-items:flex-end; justify-content:center; z-index:22; backdrop-filter:blur(6px);">
+  <div id="drawerCard" style="background:#13182e; border-top:1px solid #2a3052; border-radius:18px 18px 0 0; padding:18px 18px 22px; width:100%; max-width:520px; max-height:80dvh; overflow-y:auto; box-shadow:0 -10px 40px rgba(0,0,0,0.5);">
+    <!-- Drag handle hint -->
+    <div style="width:36px; height:4px; background:#2a3052; border-radius:2px; margin:0 auto 14px;"></div>
+    <h3 style="margin:0 0 10px; font-size:16px; color:#cbd5e1; text-align:center; letter-spacing:1px;">MENU</h3>
+    <!-- Stats snapshot (populated by openDrawer in JS) -->
+    <div style="background:#0a0e27; border-radius:8px; padding:12px 14px; margin-bottom:14px; font-size:13px; line-height:1.7;">
+      <div style="display:flex; justify-content:space-between;"><span style="opacity:0.6;">Distance</span><strong id="drawerDist">0 m</strong></div>
+      <div style="display:flex; justify-content:space-between;"><span style="opacity:0.6;">Speed Lv.</span><strong id="drawerSpeedLv">1</strong></div>
+      <div style="display:flex; justify-content:space-between;"><span style="opacity:0.6;">Money</span><strong id="drawerMoney" style="color:#fde047;">$0</strong></div>
+      <div style="display:flex; justify-content:space-between;"><span style="opacity:0.6;">Engine Lv.</span><strong id="drawerUpgLv">0</strong></div>
+      <div style="display:flex; justify-content:space-between;"><span style="opacity:0.6;">Passenger</span><strong id="drawerPass">0/1</strong></div>
+    </div>
+    <button onclick="closeDrawer(); openGarage();" style="width:100%; padding:12px; font-size:15px; margin-top:0; background:#2a3052; color:#fde047;">Garage</button>
+    <button onclick="closeDrawer(); openSettings();" style="width:100%; padding:12px; font-size:15px; margin-top:8px; background:#2a3052; color:#a5b4fc;">Settings</button>
+    <button onclick="closeDrawer(); openMainMenu();" style="width:100%; padding:12px; font-size:15px; margin-top:8px; background:#2a3052;">Main Menu</button>
+    <button onclick="closeDrawer()" style="width:100%; padding:12px; font-size:14px; margin-top:8px; background:transparent; border:1px solid #3a4070; color:#e8eef9;">Close</button>
   </div>
 </div>
 
@@ -281,10 +484,10 @@
 
 <!-- Mobile touch controls. Hidden via CSS unless body.touch is set in JS. -->
 <div id="touchControls">
-  <div id="touchLeft"  class="touch-btn" data-key="a">◀</div>
-  <div id="touchRight" class="touch-btn" data-key="d">▶</div>
+  <div id="touchLeft"  class="touch-btn" data-key="a">LEFT</div>
+  <div id="touchRight" class="touch-btn" data-key="d">RIGHT</div>
   <div id="touchGas"   class="touch-btn" data-key="w">GAS</div>
-  <div id="touchBrake" class="touch-btn" data-key="s">BRK</div>
+  <div id="touchBrake" class="touch-btn" data-key="s">BRAKE</div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -765,19 +968,42 @@ exhaust.rotation.x = Math.PI / 2;
 exhaust.position.set(0.7, 0.6, -2.2);
 car.add(exhaust);
 function makeWheel(x, z, mismatch) {
-  const w = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.45, 0.45, 0.32, 14),
-    new THREE.MeshStandardMaterial({ color: mismatch ? 0x5a5a5a : 0x1a1a1a, roughness: 0.9 })
+  // Group = rubber tire (cylinder) + visible hub cap (smaller cylinder poking
+  // through both faces). Group rotation/spin semantics match a single Mesh.
+  // Tire width was 0.32 — bumped to 0.40 so the inner hub silver shows clearly
+  // from the rear gameplay camera. The tire color was a near-black 0x1a1a1a
+  // which read as "void / missing" against shadow; bumped to 0x2a2a2a so it
+  // still reads as black-rubber but has visible separation from the body.
+  const g = new THREE.Group();
+  const tire = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.45, 0.40, 14),
+    new THREE.MeshStandardMaterial({ color: mismatch ? 0x6a6a6a : 0x2a2a2a, roughness: 0.9 })
   );
-  w.rotation.z = Math.PI / 2;
-  w.position.set(x, 0.45, z);
-  w.castShadow = true;
-  return w;
+  tire.castShadow = true;
+  g.add(tire);
+  // Hub cap — wider than before so it's clearly visible from rear camera.
+  // Slightly taller than the tire so a silver disk pokes out both faces.
+  const hub = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.44, 12),
+    new THREE.MeshStandardMaterial({
+      color: mismatch ? 0x9aa3b0 : 0xc0c8d0,
+      metalness: 0.6, roughness: 0.4
+    })
+  );
+  g.add(hub);
+  g.rotation.z = Math.PI / 2;
+  g.position.set(x, 0.45, z);
+  return g;
 }
-const wheelFL = makeWheel(-1.05,  1.3, false);
-const wheelFR = makeWheel( 1.05,  1.3, true);
-const wheelRL = makeWheel(-1.05, -1.3, false);
-const wheelRR = makeWheel( 1.05, -1.3, false);
+// Wheel x bumped from ±1.05 → ±1.20 so the inner edge sits OUTSIDE the chassis
+// (chassis is 2 wide = ±1.0). Previously the inner half of each wheel was
+// clipping inside the chassis bounding box, which from the rear gameplay camera
+// made the front-left wheel look "missing" because dark-tire blended into the
+// dark side-panel shadow. Now the entire wheel is in clear view.
+const wheelFL = makeWheel(-1.20,  1.3, false);
+const wheelFR = makeWheel( 1.20,  1.3, true);
+const wheelRL = makeWheel(-1.20, -1.3, false);
+const wheelRR = makeWheel( 1.20, -1.3, false);
 const frontAxle = new THREE.Group();
 frontAxle.add(wheelFL); frontAxle.add(wheelFR);
 car.add(frontAxle, wheelRL, wheelRR);
@@ -1176,25 +1402,6 @@ for (let i = 0; i < BILLBOARD_COUNT; i++) {
 
 // NPC traffic was removed for the Alien Mood update — will return later.
 
-// ============================================================
-// OBJECTIVE MARKER — single floating arrow in 3D world that
-// highlights wherever the current target is. Color changes
-// with target type (civilian / house / charger).
-// ============================================================
-const objMarker = new THREE.Group();
-const objMarkerCone = new THREE.Mesh(
-  new THREE.ConeGeometry(0.7, 1.4, 4),
-  new THREE.MeshStandardMaterial({
-    color: 0x4ade80, emissive: 0x4ade80, emissiveIntensity: 0.9,
-    transparent: true, opacity: 0.9
-  })
-);
-objMarkerCone.rotation.x = Math.PI;       // tip pointing down at target
-objMarkerCone.rotation.y = Math.PI / 4;   // diamond orientation
-objMarker.add(objMarkerCone);
-objMarker.visible = false;
-scene.add(objMarker);
-
 function showPayout(amount) {
   const el = document.getElementById('payout');
   el.textContent = '+$' + amount;
@@ -1312,6 +1519,55 @@ function continueGame() {
   closeMainMenu();
   state.paused = false;
 }
+// Settings overlay — opened from the Pause overlay. Houses Music + SFX toggles
+// (moved here from the main HUD in the QoL cleanup pass to declutter the screen).
+// state.paused stays true while Settings is open since we got here via Pause.
+function openSettings() {
+  state.paused = true;
+  document.getElementById('pauseOverlay').style.display = 'none';
+  document.getElementById('settingsOverlay').style.display = 'flex';
+}
+function closeSettings() {
+  // Bounce back to the Pause overlay so the player can pick another option.
+  document.getElementById('settingsOverlay').style.display = 'none';
+  document.getElementById('pauseOverlay').style.display = 'flex';
+}
+// Garage shortcut from inside the Pause menu — hides pauseOverlay (without
+// calling closePause(), which would flicker state.paused) then opens garage.
+// This is the only way to reach the garage on mobile portrait, where the
+// HUD GARAGE button is hidden by the @media (orientation: portrait) rule.
+function gotoGarage() {
+  document.getElementById('pauseOverlay').style.display = 'none';
+  openGarage();
+}
+// Mobile drawer (☰ MENU) — pauses the game and shows a stats snapshot plus
+// quick links into Garage / Settings / Main Menu. Mobile-only by virtue of
+// the #menuBtn being hidden on desktop via CSS, but the function is safe to
+// call from any platform. Bails if game-over / ejecting so it can't stack
+// on top of those screens.
+function openDrawer() {
+  if (state.ejecting || state.gameOver) return;
+  // Pause the game while drawer is up — uses the same state.paused gate that
+  // garage / pause / settings / main menu all use, so update() freezes cleanly.
+  state.paused = true;
+  // Snapshot live stat values into the drawer's read-only stats block.
+  document.getElementById('drawerDist').textContent    = Math.floor(state.distance) + ' m';
+  document.getElementById('drawerSpeedLv').textContent = state.speedLevel;
+  document.getElementById('drawerMoney').textContent   = '$' + state.money;
+  document.getElementById('drawerUpgLv').textContent   = state.speedUpgrade;
+  document.getElementById('drawerPass').textContent    = state.passenger ? '1/1' : '0/1';
+  document.getElementById('drawerOverlay').style.display = 'flex';
+}
+function closeDrawer() {
+  document.getElementById('drawerOverlay').style.display = 'none';
+  // Only unpause if no other overlay still needs us paused.
+  if (document.getElementById('pauseOverlay').style.display    !== 'flex' &&
+      document.getElementById('settingsOverlay').style.display !== 'flex' &&
+      document.getElementById('garageOverlay').style.display   !== 'flex' &&
+      document.getElementById('mainMenuOverlay').style.display !== 'flex') {
+    state.paused = false;
+  }
+}
 function startNormalMode() {
   // Set mode FIRST — restart() reads state.gameMode to decide civilian/house/
   // pedestrian visibility, so the order matters.
@@ -1342,25 +1598,41 @@ window.closeMainMenu   = closeMainMenu;
 window.continueGame    = continueGame;
 window.startNormalMode = startNormalMode;
 window.startSpeedMode  = startSpeedMode;
+window.openSettings    = openSettings;
+window.closeSettings   = closeSettings;
+window.gotoGarage      = gotoGarage;
+window.openDrawer      = openDrawer;
+window.closeDrawer     = closeDrawer;
 // Note: function declarations are already globally accessible from inline
 // onclick attributes — these assignments just make the wiring explicit and
 // match the pattern openGarage / buyUpgrade / restart use elsewhere.
 
 addEventListener('keydown', e => {
-  // Shortcut layer: Esc closes whichever overlay is on top, P toggles pause.
-  // Order matters: deeper-stacked overlays close first.
+  // Shortcut layer: Esc closes whichever overlay is on top, P toggles pause,
+  // G toggles garage. Order matters: deeper-stacked overlays close first.
   const garageOpen   = document.getElementById('garageOverlay').style.display   === 'flex';
   const mainMenuOpen = document.getElementById('mainMenuOverlay').style.display === 'flex';
   const pauseOpen    = document.getElementById('pauseOverlay').style.display    === 'flex';
+  const settingsOpen = document.getElementById('settingsOverlay').style.display === 'flex';
+  const drawerOpen   = document.getElementById('drawerOverlay').style.display   === 'flex';
   if (e.key === 'Escape') {
-    if (garageOpen)        closeGarage();
+    if (drawerOpen)        closeDrawer();
+    else if (garageOpen)   closeGarage();
+    else if (settingsOpen) closeSettings();                    // bounce back to Pause
     else if (mainMenuOpen) { closeMainMenu(); openPause(); }   // bounce back to Pause
     else if (pauseOpen)    closePause();
     else                   openPause();                        // open it
   } else if (e.key.toLowerCase() === 'p') {
     if (state.ejecting || state.gameOver) return;
     if (pauseOpen)         closePause();
-    else if (!garageOpen && !mainMenuOpen) openPause();
+    else if (!garageOpen && !mainMenuOpen && !settingsOpen && !drawerOpen) openPause();
+  } else if (e.key.toLowerCase() === 'g') {
+    // G toggles the garage. Bail during ejection / game-over / while a
+    // different overlay is on top so it can't fight other modal states.
+    if (state.ejecting || state.gameOver) return;
+    if (pauseOpen || mainMenuOpen || settingsOpen || drawerOpen) return;
+    if (garageOpen) closeGarage();
+    else            openGarage();
   }
 });
 
@@ -1489,13 +1761,206 @@ function toggleMusic() {
   btn.style.color = onNow ? '#a5b4fc' : '#64748b';
 }
 window.toggleMusic = toggleMusic;
-function startMusicOnce() {
-  Music.start();
-  removeEventListener('click', startMusicOnce);
-  removeEventListener('keydown', startMusicOnce);
+
+// — Sound Effects (Sfx) module —
+// Self-contained Web Audio SFX module: own AudioContext (parallel to Music's
+// — browsers handle multiple contexts fine), oscillator/noise/gain primitives,
+// six event-triggered sounds + a continuous engine hum. All sounds are
+// generated procedurally; no external audio files. Public interface matches
+// Music's shape (start/stop/toggle + isOn getter) so the audio-unlock pattern
+// is identical.
+const Sfx = (() => {
+  let ctx = null, masterGain = null;
+  let on = true;
+  // Continuous engine-hum nodes (created on first start, then live forever).
+  // engineFilter is a lowpass biquad that smooths the triangle waveform into
+  // a softer hum — without it the hum sounded harsh/buzzy at low frequencies.
+  let engineOsc = null, engineGain = null, engineFilter = null;
+  // Cooldown timestamps to keep some sounds from spamming every frame
+  const cooldowns = { lowMood: 0 };
+  const LOW_MOOD_COOLDOWN_SEC = 1.6;
+
+  function init() {
+    if (ctx) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ctx = new AC();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = 0.25;          // SFX overall volume
+      masterGain.connect(ctx.destination);
+    } catch (e) { console.warn('Sfx audio not available:', e); }
+  }
+
+  // — Primitives —
+  function blip(freq, dur, type, vol) {
+    if (!on || !ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type || 'square';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol || 0.2, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(masterGain);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function sweep(fromFreq, toFreq, dur, type, vol) {
+    if (!on || !ctx) return;
+    const t = ctx.currentTime;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(fromFreq, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(40, toFreq), t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol || 0.25, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g).connect(masterGain);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function noiseBurst(dur, hpHz, vol) {
+    if (!on || !ctx) return;
+    const t = ctx.currentTime;
+    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() - 0.5) * 2;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass'; filter.frequency.value = hpHz || 1200;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol || 0.18, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(filter).connect(g).connect(masterGain);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+
+  // — Named sounds —
+  // Every named sound has an explicit `if (!on) return;` so when the SFX
+  // toggle is OFF we don't even schedule wasted setTimeouts. The blip/sweep
+  // helpers also re-check `on` at fire time, so a mid-flight toggle-off
+  // silences any in-flight chained tones too.
+  // Charge pad: rising fifth, clean bell-like
+  function chargeDing() {
+    if (!on) return;
+    blip(880, 0.10, 'sine', 0.22);
+    setTimeout(() => blip(1320, 0.18, 'sine', 0.20), 80);
+  }
+  // Pickup: short happy two-tone chirp
+  function pickup() {
+    if (!on) return;
+    blip(660, 0.08, 'triangle', 0.20);
+    setTimeout(() => blip(990, 0.10, 'triangle', 0.18), 60);
+  }
+  // Dropoff payout: arcade ka-ching, three rising squares
+  function payout() {
+    if (!on) return;
+    blip(880,  0.07, 'square', 0.16);
+    setTimeout(() => blip(1175, 0.07, 'square', 0.16), 60);
+    setTimeout(() => blip(1480, 0.14, 'square', 0.18), 120);
+  }
+  // Low mood: descending sawtooth groan; internal cooldown so it doesn't spam
+  function lowMoodWarning() {
+    if (!on || !ctx) return;
+    if (ctx.currentTime < cooldowns.lowMood) return;
+    cooldowns.lowMood = ctx.currentTime + LOW_MOOD_COOLDOWN_SEC;
+    sweep(380, 180, 0.22, 'sawtooth', 0.16);
+  }
+  // Ejection: cartoon launch — square sweep up + sine sweep down
+  function eject() {
+    if (!on) return;
+    sweep(220, 880, 0.45, 'square', 0.22);
+    setTimeout(() => sweep(660, 110, 0.5, 'sine', 0.22), 220);
+  }
+  // Pedestrian hit (Speed Mode): low thunk + quick spring boing
+  function pedestrianHit() {
+    if (!on) return;
+    blip(180, 0.05, 'square', 0.26);
+    sweep(700, 220, 0.22, 'triangle', 0.18);
+  }
+
+  // — Engine hum (continuous) —
+  // Built once on first start, then lives forever. We never tear down the
+  // oscillator (mutating gain to 0 is cheaper and avoids click/pop artifacts).
+  // The `if (engineOsc) return` guard at the top of startEngine prevents
+  // accidental stacking — repeated SFX-off / SFX-on / pause / resume never
+  // create a second engine oscillator.
+  function startEngine() {
+    if (!on || !ctx || engineOsc) return;
+    engineOsc    = ctx.createOscillator();
+    engineGain   = ctx.createGain();
+    engineFilter = ctx.createBiquadFilter();
+    engineFilter.type = 'lowpass';
+    engineFilter.frequency.value = 220;       // gentle high-cut; warms the hum
+    engineFilter.Q.value = 0.7;
+    engineOsc.type = 'triangle';              // softer than sawtooth at low Hz
+    engineOsc.frequency.value = 40;
+    engineGain.gain.value = 0;
+    engineOsc.connect(engineFilter).connect(engineGain).connect(masterGain);
+    engineOsc.start();
+  }
+  // Immediate cut, not asymptotic. cancelScheduledValues kills any pending
+  // gain ramp from updateEngine so a late ramp can't "win" after a toggle-off.
+  function stopEngine() {
+    if (!ctx || !engineGain) return;
+    const t = ctx.currentTime;
+    engineGain.gain.cancelScheduledValues(t);
+    engineGain.gain.setValueAtTime(0, t);
+  }
+  // speed01 = normalized 0..1+ speed; freq + gain follow it. Subtle on purpose.
+  // Pitch range 40..150 Hz, gain peaks at 0.04 — background feedback only.
+  function updateEngine(speed01) {
+    if (!on || !ctx || !engineOsc) return;
+    const t = ctx.currentTime;
+    const clamped = Math.max(0, Math.min(1.4, speed01));
+    const freq = 40   + clamped * 80;          // 40..152 Hz
+    const vol  = 0.005 + clamped * 0.03;       // peaks around 0.04
+    engineOsc.frequency.linearRampToValueAtTime(freq, t + 0.10);
+    engineGain.gain.linearRampToValueAtTime(vol,  t + 0.10);
+  }
+
+  function start() {
+    init();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume();
+    startEngine();
+  }
+  function stop() { stopEngine(); }
+  function toggle() {
+    on = !on;
+    if (on) { if (ctx) startEngine(); }
+    else    { stopEngine(); }
+    return on;
+  }
+  return {
+    start, stop, toggle,
+    chargeDing, pickup, payout, lowMoodWarning, eject, pedestrianHit,
+    startEngine, stopEngine, updateEngine,
+    get isOn() { return on; }
+  };
+})();
+function toggleSfx() {
+  const onNow = Sfx.toggle();
+  const btn = document.getElementById('sfxBtn');
+  btn.textContent = onNow ? 'SFX: ON' : 'SFX: OFF';
+  btn.style.color = onNow ? '#fcd34d' : '#64748b';
 }
-addEventListener('click', startMusicOnce);
-addEventListener('keydown', startMusicOnce);
+window.toggleSfx = toggleSfx;
+
+// Audio unlock: first click/keydown starts BOTH Music and Sfx — browsers
+// require a user gesture before AudioContext can produce sound. Single
+// listener, one-shot (removes itself after firing).
+function startAudioOnce() {
+  Music.start();
+  Sfx.start();
+  removeEventListener('click', startAudioOnce);
+  removeEventListener('keydown', startAudioOnce);
+  removeEventListener('pointerdown', startAudioOnce);
+}
+addEventListener('click', startAudioOnce);
+addEventListener('keydown', startAudioOnce);
+addEventListener('pointerdown', startAudioOnce);   // mobile tap counts too
 
 const MAX_PARTICLES = 120;
 const particleGeom = new THREE.BufferGeometry();
@@ -1665,6 +2130,7 @@ function updatePedestrians(dt) {
       // (so they fly forward roughly with the car) plus randomness for chaos.
       p.flying = true;
       p.flyTimer = PEDESTRIAN_FLY_TIME;
+      Sfx.pedestrianHit();
       const carSign = state.car.speed >= 0 ? 1 : -1;
       const fwdShare = state.car.speed * 0.55;       // share of car momentum
       p.vx = (Math.random() - 0.5) * 6 + Math.sin(state.car.heading) * fwdShare;
@@ -1763,20 +2229,48 @@ addEventListener('keyup', e => state.keys[e.key.toLowerCase()] = false);
 // dictionary the keyboard writes to, so the throttle/steer code below
 // doesn't need to know touch even exists. Multi-touch works because each
 // button captures its own pointerId.
+// — Mobile touch controls —
+// Implementation notes (search "Mobile touch controls" to find this block):
+//   * We use POINTER events (pointerdown/up/cancel/leave) instead of raw
+//     touchstart/touchend. Pointer events are a unified layer that handle
+//     touch + mouse + pen — same code works on phones, iPads with Apple
+//     Pencil, and Surface tablets with a stylus. On touch devices, they
+//     fire the same way touchstart/touchend would.
+//   * Each on-screen button maps to a KEYBOARD KEY via data-key="a|d|w|s"
+//     and writes into the same `state.keys[]` map the keyboard fires into.
+//     One input pipeline, two ways in — no duplicate state to sync.
+//   * setPointerCapture pins the press to the button even if the finger
+//     drifts off — so steering doesn't randomly release while you're holding.
+//   * `pointer: coarse` media query gates the whole thing: desktops never
+//     see the body.touch class, so keyboard play is byte-identical to before.
 (function setupTouchControls() {
-  // pointer:coarse is true on phones/tablets (finger input) and false on
-  // desktop with a mouse/trackpad. Avoids false positives on macOS where
-  // 'ontouchstart' / maxTouchPoints can lie.
   const isTouch = matchMedia('(pointer: coarse)').matches;
   if (!isTouch) return;
   document.body.classList.add('touch');
+
+  // Defense-in-depth: bail if any blocking overlay is on top. update() also
+  // short-circuits via state.paused / gameOver / ejecting, but guarding here
+  // means the .active highlight doesn't toggle weirdly during a pause-tap.
+  function blocked() {
+    return state.paused
+        || state.gameOver
+        || state.ejecting
+        || document.getElementById('pauseOverlay').style.display    === 'flex'
+        || document.getElementById('mainMenuOverlay').style.display === 'flex'
+        || document.getElementById('garageOverlay').style.display   === 'flex'
+        || document.getElementById('settingsOverlay').style.display === 'flex'
+        || document.getElementById('drawerOverlay').style.display   === 'flex'
+        || document.getElementById('overlay').style.display         === 'flex';
+  }
+
   document.querySelectorAll('#touchControls .touch-btn').forEach(btn => {
     const key = btn.dataset.key;
     const press = e => {
+      e.preventDefault();
+      if (blocked()) return;             // silent no-op during overlays
       state.keys[key] = true;
       btn.classList.add('active');
       try { btn.setPointerCapture(e.pointerId); } catch (_) {}
-      e.preventDefault();
     };
     const release = e => {
       state.keys[key] = false;
@@ -1796,9 +2290,10 @@ addEventListener('keyup', e => state.keys[e.key.toLowerCase()] = false);
 
 function update(dt) {
   // Ejection animation runs even though gameOver is true.
-  if (state.ejecting) { runEjection(dt); return; }
-  if (state.gameOver) return;
-  if (state.paused) return;
+  // Engine hum: silence in any non-driving state so the loop doesn't hold over.
+  if (state.ejecting) { Sfx.stopEngine(); runEjection(dt); return; }
+  if (state.gameOver) { Sfx.stopEngine(); return; }
+  if (state.paused)   { Sfx.stopEngine(); return; }
 
   // Mood drains while driving. Carrying a passenger keeps the alien
   // company so the drain rate is halved.
@@ -1811,6 +2306,7 @@ function update(dt) {
     state.gameOver = true;
     state.ejecting = true;
     state.ejectTimer = state.ejectMaxTime;
+    Sfx.eject();
     // Wipe any in-flight tears so they don't freeze in mid-air during ejection.
     for (const p of tearData) { p.life = 0; p.y = -1000; }
     const lost = Math.floor(state.money / 2);
@@ -1829,6 +2325,7 @@ function update(dt) {
     if (inside && !c.wasInside) {
       state.mood = 100;
       flashCharged();
+      Sfx.chargeDing();
       c.glow.material.opacity = 1.0;
     }
     c.wasInside = inside;
@@ -1888,8 +2385,8 @@ function update(dt) {
   state.car.heading -= steerInput * 1.6 * dt * speedFactor * dir;
   state.steerAngle += (steerInput * 0.5 - state.steerAngle) * Math.min(1, dt * 8);
   frontAxle.rotation.y = state.steerAngle;
-  wheelFL.position.set(-1.05, 0.45, 1.3);
-  wheelFR.position.set( 1.05, 0.45, 1.3);
+  wheelFL.position.set(-1.20, 0.45, 1.3);
+  wheelFR.position.set( 1.20, 0.45, 1.3);
 
   state.car.x += Math.sin(state.car.heading) * state.car.speed * dt;
   state.car.z += Math.cos(state.car.heading) * state.car.speed * dt;
@@ -1978,6 +2475,7 @@ function update(dt) {
           pCarBody.material.color.setHex(c.body.material.color.getHex());
           // Picking up someone makes the alien less lonely
           state.mood = Math.min(100, state.mood + 20);
+          Sfx.pickup();
         }
       }
     }
@@ -1996,6 +2494,7 @@ function update(dt) {
           passengerInCar.visible = false;
           // Successful delivery boosts the alien's mood
           state.mood = Math.min(100, state.mood + 25);
+          Sfx.payout();
           saveProgress();
         }
       }
@@ -2049,6 +2548,11 @@ function update(dt) {
   // top — gives the rush a visible payoff at 200+ m/s instead of saturating early.
   const speedRatioCap = state.gameMode === 'speed' ? 2.0 : 1.4;
   const speedRatio = Math.min(speedRatioCap, speedMag / 60);
+
+  // Engine hum follows speed; freq/gain ramp smoothly inside the module.
+  Sfx.updateEngine(speedRatio);
+  // Low-mood warning sputter (cooldown is internal to Sfx so it can be called freely).
+  if (moodRatio < 0.25) Sfx.lowMoodWarning();
   const camDist   = 9   + speedRatio * 4;
   const camHeight = 4.5 + speedRatio * 1.0;
   const targetFov = 62  + speedRatio * 8;
@@ -2061,9 +2565,6 @@ function update(dt) {
   const camZ = state.car.z - Math.cos(state.car.heading) * camDist;
   camera.position.lerp(new THREE.Vector3(camX, camHeight, camZ), Math.min(1, dt * 4));
   camera.lookAt(state.car.x, 1.5, state.car.z);
-
-  // Refresh the navigation arrow + 3D marker
-  updateObjective(dt);
 
   document.getElementById('dist').textContent    = Math.floor(state.distance);
   document.getElementById('speedLv').textContent = state.speedLevel;
@@ -2112,103 +2613,12 @@ function update(dt) {
 }
 
 // ============================================================
-// Objective system — pick the most relevant target each frame and
-// update the HUD arrow + 3D marker accordingly.
-//   Priority: low-mood charger > drop-off house > pickup passenger
-// ============================================================
-const LOW_MOOD_THRESHOLD = 25;   // below this, route the player to a charger
-
-function pickObjective() {
-  // Helper to find the nearest object that's "ahead" of the player
-  function nearest(items, pickPos, visibleCheck) {
-    let best = null, bestDist = Infinity;
-    for (const it of items) {
-      if (visibleCheck && !visibleCheck(it)) continue;
-      const pos = pickPos(it);
-      const dx = pos.x - state.car.x;
-      const dz = pos.z - state.car.z;
-      if (dz < -25) continue;        // skip targets well behind the car
-      const d = Math.hypot(dx, dz);
-      if (d < bestDist) { bestDist = d; best = pos; }
-    }
-    return best;
-  }
-
-  // 1) Low-mood emergency: send the player to the nearest charge pad
-  if (state.mood < LOW_MOOD_THRESHOLD) {
-    const t = nearest(chargers,
-      c => ({ x: c.padX, z: c.mesh.position.z }));
-    if (t) return { pos: t, type: 'charger', label: 'Mood boost', text: 'Find mood boost' };
-  }
-  // 2) Carrying a passenger? Point at a house
-  if (state.passenger) {
-    const t = nearest(houses,
-      h => ({ x: h.mesh.position.x, z: h.mesh.position.z }),
-      h => h.mesh.visible);
-    if (t) return { pos: t, type: 'house', label: 'House', text: 'Drop off passenger' };
-  }
-  // 3) Empty? Point at a passenger
-  if (!state.passenger) {
-    const t = nearest(civilians,
-      c => ({ x: c.mesh.position.x, z: c.mesh.position.z }),
-      c => c.mesh.visible);
-    if (t) return { pos: t, type: 'civilian', label: 'Passenger', text: 'Find a passenger' };
-  }
-  return null;
-}
-
-function updateObjective(dt) {
-  const obj = pickObjective();
-  const objText  = document.getElementById('objText');
-  const objArrow = document.getElementById('objArrow');
-  const objDist  = document.getElementById('objDist');
-
-  if (!obj) {
-    objText.textContent  = 'Cruising...';
-    objDist.textContent  = '—';
-    objArrow.style.color = '#94a3b8';
-    objArrow.style.transform = 'rotate(0deg)';
-    objMarker.visible = false;
-    return;
-  }
-
-  // HUD text + distance
-  const dx = obj.pos.x - state.car.x;
-  const dz = obj.pos.z - state.car.z;
-  const dist = Math.hypot(dx, dz);
-  objText.textContent = obj.text;
-  objDist.textContent = obj.label + ': ' + Math.round(dist) + 'm';
-
-  // HUD arrow rotation: angle relative to car's heading.
-  // 0° = target straight ahead, +90° = target to the right.
-  const worldAngle = Math.atan2(dx, dz);
-  const relAngle = worldAngle - state.car.heading;
-  objArrow.style.transform = 'rotate(' + (relAngle * 180 / Math.PI).toFixed(1) + 'deg)';
-
-  // Color by target type (also applied to the 3D marker)
-  const css = obj.type === 'civilian' ? '#4ade80'
-            : obj.type === 'house'    ? '#fde047'
-            :                            '#60a5fa';
-  const hex = obj.type === 'civilian' ? 0x4ade80
-            : obj.type === 'house'    ? 0xfde047
-            :                            0x60a5fa;
-  objArrow.style.color = css;
-
-  // 3D marker bobs above the target
-  objMarker.visible = true;
-  const bob = Math.sin(performance.now() / 280) * 0.4;
-  objMarker.position.set(obj.pos.x, 5.2 + bob, obj.pos.z);
-  objMarkerCone.material.color.setHex(hex);
-  objMarkerCone.material.emissive.setHex(hex);
-}
-
-// ============================================================
 // Navigation — picks the most relevant target right now and
 // updates the HUD arrow + objective text + distance, plus
 // animates the floating world markers above each pool item.
+//   Priority: low-mood charger > drop-off house > pickup passenger
 // ============================================================
-// Reuses LOW_MOOD_THRESHOLD defined further up — same number, same purpose
-// (route to charger when mood crashes); collapsed to a single source of truth.
+const LOW_MOOD_THRESHOLD = 25;   // below this, route the player to a charger
 
 function updateNavigation(dt) {
   // 1) Decide what the player should do.
